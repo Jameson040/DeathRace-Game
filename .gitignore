@@ -1,0 +1,21 @@
+# Temporary Chrome Profiles & Browser testing
+.chrome_profile*
+*.log
+
+# Operating System Files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Editor & IDE artifacts
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary & Test scratch files
+scratch/
+tmp/
+*.tmp

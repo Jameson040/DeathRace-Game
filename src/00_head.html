@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEATH RACE — Vehicular Combat Circuit</title>
+<style>
+  :root { --red:#ff3b1f; --amber:#ffb300; --ink:#f4efe6; --panel:rgba(12,10,12,0.62); --line:rgba(255,179,0,0.55); }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:#050505; color:var(--ink); overflow:hidden;
+    font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; user-select:none; }
+  #gl { position:fixed; inset:0; width:100vw; height:100vh; display:block; outline:none; }
+  .hidden { display:none !important; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:8px 12px; backdrop-filter: blur(2px); }
+  #fps { position:fixed; left:8px; bottom:6px; font:12px/1.2 monospace; color:#9fe870; background:rgba(0,0,0,.45); padding:2px 6px; border-radius:4px; z-index:5; }
+  #hud { position:fixed; inset:0; pointer-events:none; z-index:2; }
+  #hud-tl { position:absolute; left:14px; top:12px; min-width:170px; font:600 15px/1.45 Impact, "Arial Narrow", sans-serif; letter-spacing:.5px; }
+  #hud-tl b { color:var(--amber); font-weight:700; }
+  #hud-bl { position:absolute; left:14px; bottom:14px; width:210px; text-align:left; }
+  #spd { font:700 56px/1 Impact, "Arial Narrow", sans-serif; color:#fff; letter-spacing:1px; }
+  #spd-unit { font:600 12px/1 monospace; color:var(--amber); margin-top:2px; }
+  #gear { display:inline-block; margin-top:8px; padding:3px 10px; border-radius:3px; font:700 13px/1 monospace; background:#333; color:#ddd; letter-spacing:1px; }
+  #gear.FORWARD { background:#1f7a3a; color:#fff; }
+  #gear.BRAKING { background:#b85c00; color:#fff; }
+  #gear.REVERSE { background:#b00f2a; color:#fff; animation: blink .5s steps(2) infinite; }
+  #gear.NEUTRAL { background:#444; color:#ddd; }
+  @keyframes blink { 50% { opacity:.55; } }
+  #hud-br { position:absolute; right:14px; bottom:14px; width:260px; font:600 12px/1.2 monospace; }
+  #blind { position:fixed; inset:0; pointer-events:none; z-index:1; opacity:0; background:radial-gradient(ellipse at center, rgba(205,210,216,.88) 0%, rgba(120,126,134,.97) 70%); }
+  .loadout { margin:2px 0 6px; white-space:nowrap; }
+  .chip { display:inline-block; min-width:38px; text-align:center; padding:1px 4px; margin-right:3px; border:1px solid #ffb300; border-radius:3px; font-size:11px; color:#ffe9a6; }
+  .chip.locked { opacity:.28; border-color:#555; color:#888; }
+  .bar { height:12px; background:rgba(255,255,255,.12); border-radius:3px; overflow:hidden; margin:3px 0 9px; }
+  .bar > i { display:block; height:100%; width:100%; background:linear-gradient(90deg,#2fbf5b,#c8ff4d); transition: width .12s linear; }
+  #healthFill { background:linear-gradient(90deg,#8a0d0d,#ff3b1f,#ffb300); }
+  #nitroFill { background:linear-gradient(90deg,#0a4ea8,#25d0ff); }
+  #hud-tr { position:absolute; right:14px; top:12px; width:250px; font:600 12px/1.5 monospace; text-align:right; }
+  #wrong { position:absolute; top:22%; left:50%; transform:translateX(-50%); font:800 42px Impact, "Arial Narrow", sans-serif; color:#ff3b1f; text-shadow:0 0 12px #000; letter-spacing:3px; }
+  #center { position:absolute; left:0; right:0; top:26%; text-align:center; }
+  #countdown { font:800 120px/1 Impact, "Arial Narrow", sans-serif; color:#fff; text-shadow:0 0 22px rgba(255,80,0,.9), 0 4px 0 #000; }
+  #msg { font:700 22px/1.3 Impact, "Arial Narrow", sans-serif; color:var(--amber); text-shadow:0 2px 6px #000; min-height:30px; }
+  #pickupMsg { position:absolute; left:50%; bottom:120px; transform:translateX(-50%); font:700 18px Impact,"Arial Narrow",sans-serif; color:#9ff; text-shadow:0 2px 6px #000; }
+  .overlay { position:fixed; inset:0; z-index:10; display:flex; align-items:center; justify-content:center; background:radial-gradient(ellipse at center, rgba(16,12,18,.6), rgba(4,3,6,.94)); backdrop-filter: blur(5px); }
+  .sheet { width:min(1360px, 96vw); height:92vh; max-height:92vh; display:flex; flex-direction:column; justify-content:space-between; background:rgba(12,10,14,.92); border:1px solid var(--line); border-radius:12px; padding:18px 24px; box-shadow:0 0 50px rgba(0,0,0,.85), 0 0 25px rgba(255,59,31,.2); overflow:hidden; }
+  h1 { margin:0; font:800 64px/1 Impact, "Arial Narrow", sans-serif; letter-spacing:4px; color:var(--red); text-shadow:0 0 18px rgba(255,59,31,.55), 0 4px 0 #000; }
+  h1 span { color:var(--amber); }
+  h2 { font:700 18px Impact, "Arial Narrow", sans-serif; letter-spacing:2px; color:var(--amber); margin:18px 0 8px; text-transform:uppercase; }
+  .tag { color:#bbb; font-size:14px; margin:6px 0 4px; }
+  .cards { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; }
+  .biome-card { cursor:pointer; border:2px solid #3a3a3a; border-radius:8px; padding:12px; background:#121212; color:var(--ink); text-align:left; font:inherit; transition: border-color .15s, transform .15s; }
+  .biome-card:hover { border-color:#777; transform: translateY(-2px); }
+  .biome-card.sel { border-color:var(--red); box-shadow:0 0 16px rgba(255,59,31,.4); }
+  .biome-card .sw { height:54px; border-radius:5px; margin-bottom:8px; }
+  .biome-card b { display:block; font:700 17px Impact, "Arial Narrow", sans-serif; letter-spacing:1px; }
+  .biome-card small { color:#aaa; font-size:12.5px; line-height:1.35; display:block; margin-top:4px; }
+  .garage { display:flex; gap:10px; overflow-x:auto; padding:4px 2px 8px; scroll-behavior:smooth; }
+  .garage .biome-card { min-width:180px; max-width:180px; flex-shrink:0; padding:8px 10px; }
+  .char-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap:10px; margin-bottom:16px; }
+  .char-card { cursor:pointer; border:2px solid #333; border-radius:8px; padding:6px; background:#101010; color:var(--ink); text-align:center; transition: all .15s; }
+  .char-card:hover { border-color:#888; transform: translateY(-2px); }
+  .char-card.sel { border-color:var(--amber); box-shadow:0 0 16px rgba(255,179,0,.5); background:#1a1508; }
+  .char-card img { width:100%; height:120px; object-fit:cover; border-radius:5px; margin-bottom:6px; display:block; }
+  .char-card b { display:block; font:700 13px Impact, "Arial Narrow", sans-serif; letter-spacing:0.5px; color:#fff; }
+  .char-card small { color:#aaa; font:11px/1.2 monospace; display:block; margin-top:2px; }
+
+  /* Pro-Grade Wizard Menu System */
+  .menu-header { display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #28242a; padding-bottom:12px; margin-bottom:10px; flex-shrink:0; }
+  .menu-brand { display:flex; flex-direction:column; }
+  .game-logo { font:800 34px/1 Impact, "Arial Narrow", sans-serif; letter-spacing:3px; color:var(--red); text-shadow:0 0 16px rgba(255,59,31,.6); margin:0; }
+  .game-logo span { color:var(--amber); }
+  .game-tagline { font:700 10.5px monospace; letter-spacing:1.5px; color:#888; margin-top:2px; }
+  .wizard-nav { display:flex; align-items:center; gap:8px; background:rgba(0,0,0,.5); padding:4px 10px; border-radius:30px; border:1px solid #332d36; }
+  .wizard-tab { display:flex; align-items:center; gap:6px; background:transparent; border:1px solid transparent; border-radius:20px; padding:6px 14px; font:700 13px Impact, "Arial Narrow", sans-serif; letter-spacing:1px; color:#888; cursor:pointer; transition:all .2s; }
+  .wizard-tab:hover { color:#fff; background:rgba(255,255,255,.06); }
+  .wizard-tab.active { color:#fff; background:linear-gradient(90deg, rgba(255,59,31,.3), rgba(255,179,0,.3)); border-color:var(--amber); box-shadow:0 0 12px rgba(255,179,0,.4); }
+  .wizard-tab .tab-num { font:700 11px monospace; color:var(--amber); }
+  .wizard-sep { color:#444; font:12px monospace; }
+  .menu-top-actions { display:flex; align-items:center; gap:8px; }
+  .btn-tool { background:#1a161c; border:1px solid #3a323e; border-radius:4px; color:#ccc; font:700 12px Impact, "Arial Narrow", sans-serif; letter-spacing:.8px; padding:6px 12px; cursor:pointer; transition:all .15s; }
+  .btn-tool:hover { background:#2a222e; color:#fff; border-color:var(--amber); }
+
+  .menu-stage-panel { flex:1; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden; }
+  .stage-subhead { margin-bottom:8px; flex-shrink:0; }
+  .stage-subhead h3 { font:800 22px/1.2 Impact, "Arial Narrow", sans-serif; letter-spacing:1.5px; color:#f4efe6; margin:0 0 3px; text-transform:uppercase; }
+  .stage-desc { font:12.5px/1.3 monospace; color:#aaa; margin:0; }
+  .stage-footer { display:flex; align-items:center; justify-content:space-between; border-top:1px solid #28242a; padding-top:10px; margin-top:8px; flex-shrink:0; }
+  .footer-hint { font:11.5px monospace; color:#777; }
+  .btn-cta { font:800 15px Impact, "Arial Narrow", sans-serif; letter-spacing:1.5px; padding:10px 22px; border:none; border-radius:6px; cursor:pointer; background:linear-gradient(90deg,#ff3b1f,#ff7a1a); color:#fff; box-shadow:0 3px 0 #8a1500, 0 0 16px rgba(255,59,31,.4); text-transform:uppercase; transition:all .15s; }
+  .btn-cta:hover { filter:brightness(1.15); transform:translateY(-1px); }
+  .btn-start-deploy { font:800 17px Impact, "Arial Narrow", sans-serif; letter-spacing:2px; padding:12px 30px; border:none; border-radius:6px; cursor:pointer; background:linear-gradient(90deg,#ff2a00,#ff8c00); color:#fff; box-shadow:0 4px 0 #801000, 0 0 24px rgba(255,60,0,.6); text-transform:uppercase; animation:pulseDeploy 2s infinite; }
+  @keyframes pulseDeploy { 0%, 100% { box-shadow:0 4px 0 #801000, 0 0 20px rgba(255,60,0,.5); } 50% { box-shadow:0 4px 0 #801000, 0 0 35px rgba(255,140,0,.8); } }
+
+  /* Stage 1: 3-Character Sliding Carousel */
+  .pilot-carousel-wrap { display:flex; align-items:center; justify-content:center; gap:20px; flex:1; position:relative; margin:4px 0; }
+  .carousel-arrow { width:48px; height:48px; border-radius:50%; background:rgba(20,16,22,.85); border:2px solid #443c4a; color:#ffb300; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all .2s; z-index:5; flex-shrink:0; box-shadow:0 4px 12px rgba(0,0,0,.5); }
+  .carousel-arrow:hover { border-color:#ff3b1f; color:#fff; transform:scale(1.12); box-shadow:0 0 18px rgba(255,59,31,.6); }
+  .pilot-carousel-cards { display:flex; align-items:center; justify-content:center; gap:24px; width:100%; max-width:1080px; height:100%; min-height:410px; perspective:1200px; }
+  .char-slide { border-radius:10px; background:#120e14; border:2px solid #332b36; transition:all .35s cubic-bezier(.2,.8,.2,1); cursor:pointer; display:flex; flex-direction:column; overflow:hidden; }
+  .char-slide.prev, .char-slide.next { width:240px; height:360px; opacity:.45; filter:grayscale(40%); transform:scale(.85); }
+  .char-slide.prev { transform:scale(.85) perspective(800px) rotateY(12deg); }
+  .char-slide.prev:hover, .char-slide.next:hover { opacity:.75; filter:grayscale(0%); transform:scale(.88); }
+  .char-slide.next { transform:scale(.85) perspective(800px) rotateY(-12deg); }
+  .char-slide.active { width:360px; height:450px; opacity:1; border-color:var(--red); box-shadow:0 0 30px rgba(255,59,31,.55), inset 0 0 20px rgba(255,59,31,.15); transform:scale(1.04); z-index:2; }
+  .char-poster { width:100%; height:190px; object-fit:cover; object-position:center top; display:block; border-bottom:2px solid #221c24; }
+  .char-slide.active .char-poster { height:220px; }
+  .char-info { padding:10px 14px; display:flex; flex-direction:column; gap:4px; flex:1; justify-content:space-between; }
+  .char-badge { font:700 10px monospace; padding:2px 6px; border-radius:3px; background:rgba(255,59,31,.25); color:#ff7a1a; border:1px solid rgba(255,59,31,.5); align-self:flex-start; letter-spacing:1px; }
+  .char-name { font:800 22px/1.1 Impact, "Arial Narrow", sans-serif; letter-spacing:1px; color:#fff; }
+  .char-title { font:700 12px monospace; color:var(--amber); letter-spacing:.5px; }
+  .char-quote { font:italic 12px/1.3 "Georgia", serif; color:#ffd699; border-left:2px solid var(--amber); padding-left:8px; margin:4px 0; }
+  .char-specialty { font:700 11px monospace; color:#5cff8a; background:rgba(92,255,138,.1); border:1px solid rgba(92,255,138,.3); padding:3px 6px; border-radius:3px; }
+  .char-bio { font:11px/1.3 monospace; color:#999; margin-top:2px; }
+  .pilot-dots { display:flex; align-items:center; justify-content:center; gap:8px; margin:4px 0; }
+  .pilot-dots .dot { width:10px; height:10px; border-radius:50%; background:#332d36; cursor:pointer; transition:all .2s; }
+  .pilot-dots .dot.active { background:var(--amber); box-shadow:0 0 10px var(--amber); transform:scale(1.3); }
+
+  /* Stage 2: Track & Weather as One */
+  .track-weather-grid { display:grid; grid-template-columns: 1.4fr 1fr; gap:16px; flex:1; overflow:hidden; }
+  .tw-col { display:flex; flex-direction:column; overflow:hidden; background:rgba(14,12,16,.7); border:1px solid #28242c; border-radius:8px; padding:12px; }
+  .tw-col-header { display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #2c2532; padding-bottom:8px; margin-bottom:8px; flex-shrink:0; }
+  .tw-col-title { font:800 13px Impact, "Arial Narrow", sans-serif; letter-spacing:1.2px; color:#aaa; }
+  .tw-col-active { font:700 11.5px monospace; color:var(--amber); background:rgba(255,179,0,.15); border:1px solid rgba(255,179,0,.4); padding:2px 8px; border-radius:4px; }
+  .biome-cards-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; overflow-y:auto; flex:1; padding-right:4px; }
+  .light-cards { display:flex; flex-direction:column; gap:6px; overflow-y:auto; flex:1; padding-right:4px; }
+  .tw-env-telemetry { margin-top:8px; background:rgba(8,7,10,.85); border:1px solid #332a3a; border-radius:6px; padding:8px 10px; font:11px/1.35 monospace; color:#aaa; flex-shrink:0; }
+  .tw-telemetry-title { font:700 11px monospace; color:#5cff8a; margin-bottom:4px; letter-spacing:1px; }
+  .tw-telemetry-item { display:flex; justify-content:space-between; margin-bottom:2px; }
+  .tw-telemetry-item b { color:#fff; }
+  .tw-telemetry-tip { margin-top:5px; color:#ffb300; font-size:10px; }
+
+  /* Stage 3: Vehicle Dossier with Visuals & Stats */
+  .vehicle-dossier-wrap { display:grid; grid-template-columns: 1.15fr 0.85fr; gap:16px; flex:1; overflow:hidden; margin-bottom:8px; }
+  .veh-specs-dossier { display:flex; flex-direction:column; justify-content:space-between; background:rgba(14,12,16,.8); border:1px solid #2c2532; border-radius:8px; padding:14px 18px; overflow-y:auto; }
+  .veh-specs-header { border-bottom:1px solid #2a222e; padding-bottom:8px; margin-bottom:10px; }
+  .veh-specs-header h2 { font:800 26px/1.1 Impact, "Arial Narrow", sans-serif; letter-spacing:1.5px; color:#fff; margin:4px 0 2px; }
+  .veh-specs-blurb { font:12px/1.35 monospace; color:#bbb; }
+  .dossier-meters { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+  .meter-row { display:flex; flex-direction:column; gap:2px; }
+  .meter-head { display:flex; justify-content:space-between; font:700 10.5px monospace; color:#aaa; }
+  .meter-head b { color:#fff; font-weight:700; }
+  .meter-track { height:7px; background:rgba(255,255,255,.08); border-radius:3px; overflow:hidden; }
+  .meter-fill { height:100%; border-radius:3px; transition:width .3s ease-out; }
+  .meter-speed { background:linear-gradient(90deg,#0a4ea8,#00d2ff); }
+  .meter-accel { background:linear-gradient(90deg,#b85c00,#ffb300); }
+  .meter-armor { background:linear-gradient(90deg,#8a0d0d,#ff3b1f); }
+  .meter-grip { background:linear-gradient(90deg,#1b6e3b,#5cff8a); }
+  .meter-mass { background:linear-gradient(90deg,#5b1b8a,#c85cff); }
+  .hardpoints-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; font:11px monospace; color:#ccc; }
+  .hp-chip { background:rgba(0,0,0,.5); border:1px solid #332b38; padding:3px 6px; border-radius:4px; display:flex; align-items:center; gap:5px; }
+  .hp-chip b { color:#ffb300; }
+  .veh-preview-frame { position:relative; border:1px dashed rgba(255,179,0,.3); border-radius:8px; display:flex; align-items:flex-end; justify-content:space-between; padding:12px; pointer-events:none; }
+  .frame-corner { position:absolute; width:14px; height:14px; border-color:var(--amber); border-style:solid; }
+  .frame-corner.tl { top:-1px; left:-1px; border-width:2px 0 0 2px; }
+  .frame-corner.tr { top:-1px; right:-1px; border-width:2px 2px 0 0; }
+  .frame-corner.bl { bottom:-1px; left:-1px; border-width:0 0 2px 2px; }
+  .frame-corner.br { bottom:-1px; right:-1px; border-width:0 2px 2px 0; }
+  .frame-tag { font:700 10.5px monospace; color:var(--amber); letter-spacing:1px; background:rgba(0,0,0,.7); padding:3px 8px; border-radius:3px; }
+  .frame-watermark { font:800 22px Impact, "Arial Narrow", sans-serif; letter-spacing:2px; color:rgba(255,255,255,.2); text-transform:uppercase; }
+  .garage-selector-wrap { flex-shrink:0; background:rgba(14,12,16,.7); border:1px solid #2c2532; border-radius:8px; padding:6px 10px; }
+  .garage-selector-title { font:700 11px monospace; color:#888; margin-bottom:4px; letter-spacing:.8px; }
+
+  .car-card-badge { display:inline-block; font:700 10px monospace; padding:1px 5px; border-radius:3px; margin-left:6px; vertical-align:middle; }
+  .badge-3d { background:#0a4ea8; color:#7fd6ff; border:1px solid #25d0ff; }
+  .badge-classic { background:#333; color:#ccc; border:1px solid #555; }
+  .stat-row { display:flex; align-items:center; justify-content:space-between; font:11px monospace; color:#aaa; margin-top:3px; }
+  .stat-bar { height:6px; width:65px; background:#222; border-radius:2px; overflow:hidden; }
+  .stat-fill { height:100%; background:linear-gradient(90deg, #ffb300, #ff3b1f); }
+
+  #minimap-panel {
+    position: absolute;
+    left: 14px;
+    bottom: 125px;
+    width: 150px;
+    height: 150px;
+    background: rgba(10, 8, 12, 0.78);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 2px;
+    box-shadow: 0 0 16px rgba(0,0,0,0.7);
+    pointer-events: none;
+    backdrop-filter: blur(2px);
+  }
+  #minimapCanvas { width: 100%; height: 100%; display: block; }
+
+  #killfeed {
+    position: absolute;
+    left: 14px;
+    top: 112px;
+    width: 270px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .kill-msg {
+    background: rgba(15, 10, 14, 0.88);
+    border-left: 3px solid #ff3b1f;
+    border-radius: 4px;
+    padding: 5px 10px;
+    font: 700 13px/1.3 Impact, "Arial Narrow", sans-serif;
+    letter-spacing: 0.5px;
+    color: #f4efe6;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    animation: feedSlideIn 0.25s ease-out;
+    transition: opacity 0.4s ease;
+  }
+  .kill-msg.player-kill {
+    border-left-color: #ffb300;
+    background: rgba(36, 24, 10, 0.92);
+    color: #ffe89e;
+  }
+  .kill-msg b { color: #ffb300; }
+  .kill-msg span { color: #ff5030; }
+  @keyframes feedSlideIn {
+    from { transform: translateX(-115%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  .car-card { border:1px solid #333; border-radius:6px; padding:10px 12px; background:#101010; font-size:13.5px; line-height:1.4; }
+  .car-card i { display:inline-block; width:12px; height:12px; border-radius:2px; vertical-align:middle; margin-right:6px; }
+  .btns { display:flex; gap:12px; flex-wrap:wrap; margin-top:20px; }
+  button.btn { font:700 16px Impact, "Arial Narrow", sans-serif; letter-spacing:1.5px; padding:11px 22px; border:none; border-radius:5px; cursor:pointer; background:linear-gradient(#ff5a2a,#b82100); color:#fff; box-shadow:0 3px 0 #5a0d00; text-transform:uppercase; }
+  button.btn.alt { background:linear-gradient(#444,#1d1d1d); box-shadow:0 3px 0 #000; }
+  button.btn:hover { filter:brightness(1.15); }
+  button.btn:active { transform: translateY(2px); }
+  .controls { display:grid; grid-template-columns: 1fr 1fr; gap:4px 24px; font:13px/1.6 monospace; color:#ccc; }
+  kbd { background:#222; border:1px solid #555; border-bottom-width:3px; border-radius:4px; padding:0 5px; color:#fff; }
+  #results table { width:100%; border-collapse:collapse; font:14px/1.6 monospace; }
+  #results td, #results th { border-bottom:1px solid #2a2a2a; padding:4px 8px; text-align:left; }
+  #wreck { position:fixed; inset:0; z-index:6; pointer-events:none; display:flex; align-items:center; justify-content:center; }
+  #wreckMsg { font:800 64px Impact,"Arial Narrow",sans-serif; color:#ff3b1f; text-shadow:0 0 24px #000; letter-spacing:4px; }
+  #diag { position:fixed; top:58px; right:12px; width:min(760px, 62vw); max-height:86vh; overflow:auto; z-index:8; background:rgba(8,8,10,.94); border:1px solid #2fbf5b; border-radius:6px; padding:12px 14px; font:12.5px/1.45 monospace; box-shadow:0 0 24px rgba(0,0,0,.6); }
+  #diag h3 { margin:0 0 6px; font:700 14px monospace; color:#9fe870; }
+  #diag table { width:100%; border-collapse:collapse; }
+  #diag td { border-bottom:1px solid #222; padding:3px 4px; vertical-align:top; }
+  .PASS { color:#5cff8a; font-weight:700; } .FAIL { color:#ff5b5b; font-weight:700; } .ERROR { color:#ff9f1c; font-weight:700; } .RUN { color:#ccc; }
+  #perf { color:#9cf; margin-top:8px; white-space:pre; }
+  #loading { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; font:700 22px Impact,"Arial Narrow",sans-serif; letter-spacing:3px; color:var(--amber); z-index:20; background:#050505; }
+  #loading.done { display:none; }
+  #errBox { position:fixed; left:10px; top:10px; right:10px; z-index:30; background:#3a0000; color:#ffd6d6; font:12px monospace; padding:8px; white-space:pre-wrap; display:none; max-height:30vh; overflow:auto; }
+  .keytable { width:100%; border-collapse:collapse; }
+  .keytable td { padding:6px 8px; border-bottom:1px solid #2a2a2a; font-size:14px; }
+  .keytable kbd { font:700 13px monospace; background:#1b1b1b; border:1px solid #555; border-radius:4px; padding:2px 6px; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="gl" tabindex="0"></canvas>
+<div id="loading">LOADING DEATH RACE…</div>
+<div id="errBox"></div>
+<div id="fps">-- fps</div>
+
+<div id="blind"></div>
+<div id="hud" class="hidden">
+  <canvas id="tacCanvas" style="position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:1"></canvas>
+  <div id="hud-tl" class="panel">
+    <div>LAP <b id="lap">1/3</b></div>
+    <div>POS <b id="pos">1/9</b></div>
+    <div>CHECKPOINT <b id="cp">0/12</b></div>
+    <div>TIME <b id="time">0:00.00</b></div>
+  </div>
+  <div id="hud-tr" class="panel">
+    <div id="biomeTag">INDUSTRIAL WASTELAND</div>
+    <div id="vehTag">BLOODHAMMER</div>
+  </div>
+  <div id="hud-bl" class="panel">
+    <div id="spd">0</div>
+    <div id="spd-unit">KM/H</div>
+    <div id="gear" class="NEUTRAL">NEUTRAL</div>
+  </div>
+  <div id="hud-br" class="panel">
+    <div>HULL <span id="healthTxt">100</span>%</div>
+    <div class="bar"><i id="healthFill"></i></div>
+    <div>MACHINE GUN AMMO <span id="ammoTxt">300</span></div>
+    <div class="bar"><i id="ammoFill"></i></div>
+    <div>ROCKETS <span id="rocketTxt">6</span> &nbsp;·&nbsp; <span style="color:#aaa">[Shift/E]</span></div>
+    <div class="bar"><i id="rocketFill" style="background:linear-gradient(90deg,#7a4a00,#ffb300)"></i></div>
+    <div>NITRO <span id="nitroTxt">100</span>% &nbsp;<span style="color:#aaa">[F]</span></div>
+    <div class="bar"><i id="nitroFill"></i></div>
+    <div class="loadout"><span id="ld-gun" class="chip locked">MG</span><span id="ld-rockets" class="chip locked">MSL</span><span id="ld-shield" class="chip locked">SHLD</span><span id="ld-blades" class="chip locked">BLADE</span><span id="ld-gear" class="chip locked">GEAR</span></div>
+    <div>SHIELD <span id="shieldTxt">0</span></div>
+    <div class="bar"><i id="shieldFill" style="background:linear-gradient(90deg,#1e4fff,#7fd6ff)"></i></div>
+    <div>SMOKE <span id="smokeTxt">0</span> <span style="color:#aaa">[G]</span> &nbsp;OIL <span id="oilTxt">0</span> <span style="color:#aaa">[Q]</span></div>
+    <div id="gripTxt" style="color:#7fe0ff;min-height:14px"></div>
+  </div>
+  <div id="wrong" class="hidden">WRONG WAY</div>
+  <div id="center"><div id="countdown"></div><div id="msg"></div></div>
+  <div id="pickupMsg"></div>
+  <div id="killfeed"></div>
+  <div id="minimap-panel">
+    <canvas id="minimapCanvas" width="160" height="160"></canvas>
+  </div>
+</div>
+
+<div id="menu" class="overlay">
+  <div class="menu-shell sheet">
+    <!-- Top Header: Logo, Multi-Step Wizard, Quick Utility Icons -->
+    <header class="menu-header">
+      <div class="menu-brand">
+        <h1 class="game-logo">DEATH <span>RACE</span></h1>
+        <span class="game-tagline">TACTICAL ARMORED COMBAT CIRCUIT</span>
+      </div>
+      <nav class="wizard-nav" id="wizardNav">
+        <button class="wizard-tab active" data-step="1">
+          <span class="tab-num">01</span>
+          <span class="tab-title">PILOT ROSTER</span>
+        </button>
+        <span class="wizard-sep">/</span>
+        <button class="wizard-tab" data-step="2">
+          <span class="tab-num">02</span>
+          <span class="tab-title">PLACE &amp; WEATHER</span>
+        </button>
+        <span class="wizard-sep">/</span>
+        <button class="wizard-tab" data-step="3">
+          <span class="tab-num">03</span>
+          <span class="tab-title">ARMORED VEHICLE</span>
+        </button>
+      </nav>
+      <div class="menu-top-actions">
+        <button class="btn-tool" id="btnSound">Sound: ON (M)</button>
+        <button class="btn-tool" id="btnKeys">Controls</button>
+        <button class="btn-tool" id="btnDiagMenu">Diagnostics</button>
+      </div>
+    </header>
+
+    <!-- STAGE 1: PILOT SELECTION (3 visible at a time on screen) -->
+    <section class="menu-stage-panel" id="stagePilot">
+      <div class="stage-subhead">
+        <h3>CHOOSE YOUR COMBAT PILOT</h3>
+        <p class="stage-desc">Select your syndicate driver. Only 3 pilots displayed on screen; slide or click to choose.</p>
+      </div>
+
+      <div class="pilot-carousel-wrap">
+        <button class="carousel-arrow prev" id="btnPilotPrev" aria-label="Previous Pilot">
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <div class="pilot-carousel-cards" id="pilotCarouselCards">
+          <!-- 3 cards (prev, active/selected, next) rendered dynamically -->
+        </div>
+        <button class="carousel-arrow next" id="btnPilotNext" aria-label="Next Pilot">
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+      </div>
+
+      <div class="pilot-dots" id="pilotDots"></div>
+
+      <div class="stage-footer">
+        <div class="footer-hint">Use <kbd>&larr;</kbd> <kbd>&rarr;</kbd> or <kbd>A</kbd> <kbd>D</kbd> to slide &bull; Press <kbd>ENTER</kbd> to confirm pilot</div>
+        <button class="btn-cta" id="btnNextToTrack">CONFIRM PILOT &amp; SELECT TRACK &rarr;</button>
+      </div>
+      <div class="char-grid hidden" id="charGrid"></div>
+    </section>
+
+    <!-- STAGE 2: TRACK & WEATHER AS ONE -->
+    <section class="menu-stage-panel hidden" id="stageTrack">
+      <div class="stage-subhead">
+        <h3>SELECT BATTLEGROUND &amp; ATMOSPHERIC WEATHER</h3>
+        <p class="stage-desc">Configure circuit location and weather lighting conditions. Live 3D environment updates in background.</p>
+      </div>
+
+      <div class="track-weather-grid">
+        <div class="tw-col tw-place">
+          <div class="tw-col-header">
+            <span class="tw-col-title">CIRCUIT LOCATION (PLACE)</span>
+            <span class="tw-col-active" id="selectedBiomeName">INDUSTRIAL WASTELAND</span>
+          </div>
+          <div class="biome-cards-grid cards" id="biomeCards">
+            <button class="biome-card sel" data-biome="industrial"><div class="sw" style="background:linear-gradient(#2b2233,#8a4b2a 60%,#ffb36b)"></div><b>INDUSTRIAL WASTELAND</b><small>Twilight haze, refineries, smokestacks, containers, pipe bridges, sodium streetlamps, ash fall.</small></button>
+            <button class="biome-card" data-biome="desert"><div class="sw" style="background:linear-gradient(#5aa7d9,#f2c58f 55%,#c9793e)"></div><b>SCORCHED DESERT CANYON</b><small>Sunlit dunes, sandstone mesas, arches, oil derricks, ruined billboards, dust trails.</small></button>
+            <button class="biome-card" data-biome="forest"><div class="sw" style="background:linear-gradient(#0c1b1a,#2f4a44 60%,#7d8f86)"></div><b>DARK PINE FOREST</b><small>Layered pine forest, moody fog, moonlight, rocks and fallen logs on the shoulder.</small></button>
+            <button class="biome-card" data-biome="riverside"><div class="sw" style="background:linear-gradient(#4aa0e0,#bfe3f5 50%,#3f6b2e)"></div><b>RIVER SIDE DRIVE</b><small>Green riverbank drive: a river channel runs beside the road, with broadleaf trees and rolling ground.</small></button>
+            <button class="biome-card" data-biome="brazil"><div class="sw" style="background:linear-gradient(#2f8fe0,#ffe6b0 55%,#ff3d8b)"></div><b>HIGH STREETS OF BRAZIL</b><small>Colourful facades, palm trees and a sunny high street on flat pavement.</small></button>
+            <button class="biome-card" data-biome="mumbai"><div class="sw" style="background:linear-gradient(#2a2630,#b07a4e 60%,#5b4a40)"></div><b>MUMBAI AFTER THE FALL</b><small>Broken towers, rubble and abandoned wrecks under falling ash and drifting smoke.</small></button>
+          </div>
+        </div>
+
+        <div class="tw-col tw-weather">
+          <div class="tw-col-header">
+            <span class="tw-col-title">ATMOSPHERE &amp; WEATHER</span>
+            <span class="tw-col-active" id="selectedWeatherName">HIGH NOON</span>
+          </div>
+          <div class="light-cards cards" id="lightCards">
+            <button class="biome-card light-card sel" data-light="biome"><div class="sw" style="background:linear-gradient(#2b2233,#8a4b2a 60%,#ffb36b)"></div><b>BIOME DEFAULT</b><small>Each biome keeps its own sky, fog and sun.</small></button>
+            <button class="biome-card light-card" data-light="day"><div class="sw" style="background:linear-gradient(#3c8fe6,#bfe6ff 60%,#ffffff)"></div><b>CLEAR BLUE DAY</b><small>Light blue sky, full sun and clear, bright air.</small></button>
+            <button class="biome-card light-card" data-light="sunset"><div class="sw" style="background:linear-gradient(#2e3f8f,#ff8f4f 60%,#ffd08a)"></div><b>GOLDEN SUNSET</b><small>Indigo sky, low orange sun and warm haze.</small></button>
+            <button class="biome-card light-card" data-light="night"><div class="sw" style="background:linear-gradient(#010206,#0c1428 60%,#2a3a66)"></div><b>NIGHT &bull; DARK STREETS</b><small>Near-black sky, cold moonlight and headlights.</small></button>
+            <button class="biome-card light-card" data-light="storm"><div class="sw" style="background:linear-gradient(#141a26,#4a5262 60%,#76829a)"></div><b>STORM DUSK</b><small>Grey overcast light, heavier fog and dim lamps.</small></button>
+          </div>
+          <div class="tw-env-telemetry">
+            <div class="tw-telemetry-title">ATMOSPHERIC SENSOR TELEMETRY</div>
+            <div class="tw-telemetry-item"><span>Surface Traction:</span><b id="envTraction">DRY ASPHALT (1.00)</b></div>
+            <div class="tw-telemetry-item"><span>Visibility Sightlines:</span><b id="envVisibility">OPTIMAL (100%)</b></div>
+            <div class="tw-telemetry-item"><span>Solar Radiance:</span><b id="envRadiance">HIGH NOON LUX</b></div>
+            <div class="tw-telemetry-tip">3D background environment dynamically updates to reflect your selections in real time.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage-footer">
+        <button class="btn alt" id="btnBackToPilot">&larr; BACK TO PILOT</button>
+        <div class="footer-hint">Live 3D environment updates in real time &bull; Press <kbd>ENTER</kbd> to proceed</div>
+        <button class="btn-cta" id="btnNextToVehicle">CONFIRM BATTLEGROUND &amp; SELECT VEHICLE &rarr;</button>
+      </div>
+    </section>
+
+    <!-- STAGE 3: VEHICLE WITH VISUALS, STATS & START -->
+    <section class="menu-stage-panel hidden" id="stageVehicle">
+      <div class="stage-subhead">
+        <h3>SELECT COMBAT VEHICLE &amp; DEPLOY</h3>
+        <p class="stage-desc">Inspect chassis armor, propulsion power, and weapon hardpoints. 3D car rotates live in your chosen biome.</p>
+      </div>
+
+      <div class="vehicle-dossier-wrap">
+        <div class="veh-specs-dossier">
+          <div class="veh-specs-header">
+            <span class="car-card-badge badge-3d" id="dossierBadge">3D MODEL</span>
+            <h2 id="dossierTitle">GOLIATH WAR RIG 6X6</h2>
+            <div class="veh-specs-blurb" id="dossierBlurb">Colossal 6-wheeled fortress. Crushes everything in its path.</div>
+          </div>
+          <div class="dossier-meters">
+            <div class="meter-row">
+              <div class="meter-head"><span>TOP SPEED</span><b id="statSpeedVal">62 u/s (223 km/h)</b></div>
+              <div class="meter-track"><div class="meter-fill meter-speed" id="statSpeedBar" style="width:95%"></div></div>
+            </div>
+            <div class="meter-row">
+              <div class="meter-head"><span>ACCELERATION</span><b id="statAccelVal">24 u/s&sup2;</b></div>
+              <div class="meter-track"><div class="meter-fill meter-accel" id="statAccelBar" style="width:75%"></div></div>
+            </div>
+            <div class="meter-row">
+              <div class="meter-head"><span>ARMOR &amp; HULL</span><b id="statArmorVal">260 HP (HEAVY TANK)</b></div>
+              <div class="meter-track"><div class="meter-fill meter-armor" id="statArmorBar" style="width:100%"></div></div>
+            </div>
+            <div class="meter-row">
+              <div class="meter-head"><span>DRIFT &amp; AGILITY</span><b id="statGripVal">HIGH STABILITY</b></div>
+              <div class="meter-track"><div class="meter-fill meter-grip" id="statGripBar" style="width:80%"></div></div>
+            </div>
+            <div class="meter-row">
+              <div class="meter-head"><span>RAMMING IMPACT</span><b id="statMassVal">TITAN CLASS</b></div>
+              <div class="meter-track"><div class="meter-fill meter-mass" id="statMassBar" style="width:98%"></div></div>
+            </div>
+          </div>
+          <div class="hardpoints-grid">
+            <div class="hp-chip"><span class="hp-icon">🔫</span><span>Roof Turret: <b>Auto-Aim Cannon</b></span></div>
+            <div class="hp-chip"><span class="hp-icon">🚀</span><span>Rockets: <b>Dual Pod Launchers</b></span></div>
+            <div class="hp-chip"><span class="hp-icon">🛡️</span><span>Defense: <b>Spiked Kinetic Ram</b></span></div>
+            <div class="hp-chip"><span class="hp-icon">💨</span><span>Tactical: <b>Smoke &amp; Oil Valves</b></span></div>
+          </div>
+        </div>
+
+        <div class="veh-preview-frame">
+          <div class="frame-corner tl"></div>
+          <div class="frame-corner tr"></div>
+          <div class="frame-corner bl"></div>
+          <div class="frame-corner br"></div>
+          <div class="frame-tag">LIVE 3D COMBAT RIG INSPECTION &bull; 360&deg; ROTATION</div>
+          <div class="frame-watermark" id="previewWatermark">GOLIATH WAR RIG</div>
+        </div>
+      </div>
+
+      <div class="garage-selector-wrap">
+        <div class="garage-selector-title">VEHICLE ARSENAL (16 CHASSIS) &bull; CLICK TO INSPECT:</div>
+        <div class="garage" id="garage"></div>
+      </div>
+
+      <div class="stage-footer">
+        <button class="btn alt" id="btnBackToTrack">&larr; BACK TO TRACK</button>
+        <div class="footer-hint">Ready to deploy &bull; Press <kbd>ENTER</kbd> or click START RACE</div>
+        <button class="btn-start-deploy" id="btnPlay">START RACE // DEPLOY TO CIRCUIT</button>
+      </div>
+      <div class="controls hidden" id="ctrlSummary"></div>
+    </section>
+  </div>
+</div>
+
+<div id="keys" class="overlay hidden">
+  <div class="sheet" style="width:min(760px,94vw)">
+    <h1 style="font-size:44px">CONTROLS</h1>
+    <div class="tag">Press Change, then the new key. Esc cancels. A key used by another action is swapped to that action.</div>
+    <table class="keytable"><tbody id="keyRows"></tbody></table>
+    <div id="keyStatus" style="min-height:24px;color:var(--amber);margin:8px 0;font-size:14px"></div>
+    <div class="btns">
+      <button class="btn alt" id="btnPresetDefault">WASD + arrows</button>
+      <button class="btn alt" id="btnPresetArrows">Arrow-key layout</button>
+      <button class="btn" id="btnKeysBack">Back</button>
+    </div>
+  </div>
+</div>
+
+<div id="pause" class="overlay hidden">
+  <div class="sheet" style="width:min(460px,92vw)">
+    <h1 style="font-size:48px">PAUSED</h1>
+    <div class="btns" style="flex-direction:column">
+      <button class="btn" id="btnResume">Resume</button>
+      <button class="btn alt" id="btnRestartP">Restart race</button>
+      <button class="btn alt" id="btnMenuP">Return to menu</button>
+    </div>
+  </div>
+</div>
+
+<div id="results" class="overlay hidden">
+  <div class="sheet" style="width:min(680px,94vw)">
+    <h1 id="resTitle" style="font-size:52px">RACE OVER</h1>
+    <div id="resultsBody" style="margin-top:12px"></div>
+    <div class="btns">
+      <button class="btn" id="btnRestartR">Race again</button>
+      <button class="btn alt" id="btnMenuR">Main menu</button>
+    </div>
+  </div>
+</div>
+
+<div id="wreck" class="hidden"><div id="wreckMsg">WRECKED</div></div>
+
+<div id="diag" class="hidden">
+  <h3>SELF-DIAGNOSTIC SUITE &nbsp;<span style="color:#aaa">(F3 toggles · physics fixed 120 Hz)</span></h3>
+  <div class="btns" style="margin:4px 0 8px">
+    <button class="btn" id="btnRunDiag" style="padding:6px 12px;font-size:13px">Run suite</button>
+    <button class="btn alt" id="btnCloseDiag" style="padding:6px 12px;font-size:13px">Close</button>
+  </div>
+  <table><tbody id="diagRows"><tr><td>Not run yet.</td></tr></tbody></table>
+  <div id="diagSummary" style="margin-top:8px"></div>
+  <div id="perf">Performance: collecting…</div>
+</div>
+
+<script type="module">

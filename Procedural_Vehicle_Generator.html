@@ -1,0 +1,1705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Death Race · Procedural 3D Vehicle Generator & Studio</title>
+<style>
+  :root {
+    --bg: #090a0f;
+    --panel: rgba(16, 18, 26, 0.92);
+    --panel-border: #262a38;
+    --accent: #ffb300;
+    --accent-red: #ff3b1f;
+    --accent-cyan: #00d2ff;
+    --text: #e6ebf2;
+    --muted: #8b94a5;
+    --line: #222634;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header */
+  header {
+    height: 52px;
+    background: #0f1118;
+    border-bottom: 1px solid var(--panel-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 18px;
+    z-index: 10;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand h1 {
+    font: 900 18px/1 Impact, "Arial Narrow", sans-serif;
+    letter-spacing: 1.5px;
+    color: #fff;
+    text-transform: uppercase;
+  }
+  .brand h1 span { color: var(--accent); }
+  .brand .tag {
+    font: 700 11px monospace;
+    background: #1e2333;
+    color: var(--accent-cyan);
+    padding: 2px 7px;
+    border-radius: 3px;
+    border: 1px solid #2e3852;
+  }
+  .header-actions { display: flex; align-items: center; gap: 10px; }
+
+  /* Buttons */
+  button.btn {
+    background: linear-gradient(#ff5a2a, #b82100);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font: 700 12px Impact, "Arial Narrow", sans-serif;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 7px 14px;
+    cursor: pointer;
+    box-shadow: 0 2px 0 #5a0d00;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: filter 0.15s, transform 0.1s;
+  }
+  button.btn:hover { filter: brightness(1.15); }
+  button.btn:active { transform: translateY(1px); }
+  button.btn.alt {
+    background: linear-gradient(#2d3345, #1c202d);
+    box-shadow: 0 2px 0 #0f121a;
+    border: 1px solid #3d465e;
+  }
+  button.btn.cyan {
+    background: linear-gradient(#00b4d8, #0077b6);
+    box-shadow: 0 2px 0 #004770;
+  }
+  button.btn.gold {
+    background: linear-gradient(#f39c12, #d35400);
+    box-shadow: 0 2px 0 #873600;
+  }
+
+  /* Main Workspace */
+  #workspace {
+    flex: 1;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+  }
+  #viewport-container {
+    flex: 1;
+    position: relative;
+    background: radial-gradient(circle at 50% 40%, #171b26 0%, #08090d 85%);
+  }
+  canvas#gl { width: 100%; height: 100%; display: block; }
+
+  /* Viewport Overlay Controls */
+  #view-bar {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    display: flex;
+    gap: 6px;
+    z-index: 5;
+    background: rgba(12, 14, 20, 0.75);
+    padding: 4px;
+    border-radius: 6px;
+    border: 1px solid var(--panel-border);
+    backdrop-filter: blur(4px);
+  }
+  .view-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font: 700 11px monospace;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .view-btn:hover { color: #fff; background: rgba(255,255,255,0.08); }
+  .view-btn.active { color: var(--accent); background: #1f2536; }
+
+  /* Side Panels */
+  .panel {
+    width: 330px;
+    background: var(--panel);
+    border-left: 1px solid var(--panel-border);
+    border-right: 1px solid var(--panel-border);
+    display: flex;
+    flex-direction: column;
+    z-index: 5;
+    backdrop-filter: blur(8px);
+  }
+  .panel-left { border-right: 1px solid var(--panel-border); border-left: none; width: 340px; }
+  .panel-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    font: 700 13px monospace;
+    letter-spacing: 0.5px;
+    color: var(--accent);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0,0,0,0.2);
+  }
+  .panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .panel-body::-webkit-scrollbar { width: 6px; }
+  .panel-body::-webkit-scrollbar-thumb { background: #2a3144; border-radius: 3px; }
+
+  /* Sections & Groups */
+  .section-title {
+    font: 700 11px monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .section-title::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  /* Preset Selector Cards */
+  .preset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .preset-card {
+    cursor: pointer;
+    background: #141722;
+    border: 2px solid #282f42;
+    border-radius: 6px;
+    padding: 8px 6px;
+    text-align: center;
+    transition: all 0.15s;
+  }
+  .preset-card:hover { border-color: #4a577a; transform: translateY(-1px); }
+  .preset-card.active { border-color: var(--accent); background: #211c10; box-shadow: 0 0 12px rgba(255,179,0,0.25); }
+  .preset-card .swatch { height: 16px; border-radius: 3px; margin-bottom: 6px; border: 1px solid rgba(255,255,255,0.1); }
+  .preset-card b { display: block; font: 700 11px Impact, "Arial Narrow", sans-serif; letter-spacing: 0.5px; color: #fff; }
+  .preset-card small { display: block; font: 10px monospace; color: var(--muted); margin-top: 2px; }
+
+  /* Control Rows */
+  .ctrl-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font: 12px monospace;
+    margin-bottom: 6px;
+  }
+  .ctrl-row label { color: #c4ccdc; font-size: 11.5px; }
+  .ctrl-row input[type="range"] {
+    flex: 1;
+    max-width: 140px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .ctrl-row input[type="color"] {
+    border: 1px solid #3c445c;
+    background: none;
+    width: 32px;
+    height: 24px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .ctrl-val { font: 11px monospace; color: var(--accent-cyan); width: 36px; text-align: right; }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+    font: 12px monospace;
+  }
+  .toggle-row input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
+
+  /* Tree & Tech Info */
+  .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .metric-card {
+    background: #131620;
+    border: 1px solid #23293a;
+    border-radius: 5px;
+    padding: 8px 10px;
+  }
+  .metric-card small { display: block; font: 10px monospace; color: var(--muted); text-transform: uppercase; }
+  .metric-card b { font: 700 15px monospace; color: var(--accent-cyan); }
+
+  .tree-container {
+    background: #0d0f15;
+    border: 1px solid #222736;
+    border-radius: 5px;
+    padding: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    font: 11px/1.5 monospace;
+    color: #abb3c4;
+  }
+  .tree-node { margin-left: 14px; position: relative; }
+  .tree-node::before {
+    content: "├─ ";
+    color: #4a5470;
+  }
+  .tree-root { color: var(--accent); font-weight: 700; }
+  .tree-root::before { content: ""; }
+  .tree-group { color: #64b5f6; }
+  .tree-mesh { color: #abb3c4; }
+
+  .spec-box {
+    background: #11141d;
+    border: 1px solid #23293a;
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 10px 12px;
+    font: 11px/1.5 monospace;
+    color: #c4ccdc;
+  }
+  .spec-box code { color: var(--accent-cyan); font-weight: 700; }
+
+  /* Bottom Notification Toast */
+  #toast {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(18, 22, 32, 0.95);
+    border: 1px solid var(--accent);
+    color: #fff;
+    padding: 8px 18px;
+    border-radius: 20px;
+    font: 700 12px monospace;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.6);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 100;
+  }
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>DEATH <span>RACE</span></h1>
+    <div class="tag">PROCEDURAL 3D VEHICLE STUDIO</div>
+  </div>
+  <div class="header-actions">
+    <button class="btn alt" id="btnWireframe">
+      <svg style="width:13px;height:13px;fill:currentColor" viewBox="0 0 24 24"><path d="M4 4h16v16H4V4zm2 2v12h12V6H6z"/></svg>
+      Wireframe
+    </button>
+    <button class="btn alt" id="btnAutoRotate">
+      <svg style="width:13px;height:13px;fill:currentColor" viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+      Turntable
+    </button>
+    <button class="btn gold" id="btnResetView">Reset Cam</button>
+    <button class="btn cyan" id="btnExportGLB">
+      <svg style="width:14px;height:14px;fill:currentColor" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+      Export .GLB
+    </button>
+  </div>
+</header>
+
+<div id="workspace">
+  <!-- Left Panel: Controls & Customization -->
+  <div class="panel panel-left">
+    <div class="panel-header">
+      <span>VEHICLE ARCHITECTURE</span>
+      <span style="color:#777;font-size:11px">THREE.JS PBR</span>
+    </div>
+    <div class="panel-body">
+      <!-- Preset Selectors -->
+      <div>
+        <div class="section-title">Select Preset Style</div>
+        <div class="preset-grid">
+          <div class="preset-card active" data-style="muscle">
+            <div class="swatch" style="background:#9d1b1b;border-color:#f2b705"></div>
+            <b>MUSCLE</b>
+            <small>Bloodhammer</small>
+          </div>
+          <div class="preset-card" data-style="interceptor">
+            <div class="swatch" style="background:#1d3f6e;border-color:#ff6a00"></div>
+            <b>INTERCEPTOR</b>
+            <small>Razorback</small>
+          </div>
+          <div class="preset-card" data-style="hauler">
+            <div class="swatch" style="background:#4b5a2a;border-color:#d9d9d9"></div>
+            <b>HAULER</b>
+            <small>Gutshot</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Materials & Paint -->
+      <div>
+        <div class="section-title">PBR Paint & Weathering</div>
+        <div class="ctrl-row">
+          <label>Primary Paint:</label>
+          <input type="color" id="cpPaint" value="#9d1b1b">
+        </div>
+        <div class="ctrl-row">
+          <label>Secondary Accent:</label>
+          <input type="color" id="cpAccent" value="#f2b705">
+        </div>
+        <div class="ctrl-row">
+          <label>Metalness:</label>
+          <input type="range" id="rngMetal" min="0" max="1" step="0.05" value="0.55">
+          <span class="ctrl-val" id="valMetal">0.55</span>
+        </div>
+        <div class="ctrl-row">
+          <label>Roughness:</label>
+          <input type="range" id="rngRough" min="0" max="1" step="0.05" value="0.36">
+          <span class="ctrl-val" id="valRough">0.36</span>
+        </div>
+        <div class="toggle-row">
+          <label>Procedural Weathering Map:</label>
+          <input type="checkbox" id="chkWeather" checked>
+        </div>
+      </div>
+
+      <!-- Damage & Detachment -->
+      <div>
+        <div class="section-title">Combat Damage Simulator</div>
+        <div class="ctrl-row">
+          <label>Hull Health:</label>
+          <input type="range" id="rngDamage" min="0" max="1" step="0.01" value="1">
+          <span class="ctrl-val" id="valDamage">100%</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+          Scorches paint, increases roughness, and glows red-hot under 30% HP.
+        </div>
+        <button class="btn alt" id="btnPopPlate" style="width:100%;justify-content:center">
+          Detach Armor Plate (Damage Debris)
+        </button>
+      </div>
+
+      <!-- Articulated Rigging -->
+      <div>
+        <div class="section-title">Rigging & Animation Pivots</div>
+        <div class="ctrl-row">
+          <label>Front Steer Angle:</label>
+          <input type="range" id="rngSteer" min="-0.61" max="0.61" step="0.01" value="0">
+          <span class="ctrl-val" id="valSteer">0°</span>
+        </div>
+        <div class="ctrl-row">
+          <label>Turret Yaw (Aim):</label>
+          <input type="range" id="rngTurretYaw" min="-3.14" max="3.14" step="0.05" value="0">
+          <span class="ctrl-val" id="valTurretYaw">0°</span>
+        </div>
+        <div class="ctrl-row">
+          <label>Turret Pitch (Recoil):</label>
+          <input type="range" id="rngTurretPitch" min="-0.2" max="0.5" step="0.02" value="0">
+          <span class="ctrl-val" id="valTurretPitch">0°</span>
+        </div>
+        <div class="toggle-row">
+          <label>Tyre Spin Animation:</label>
+          <input type="checkbox" id="chkSpin">
+        </div>
+        <div class="toggle-row">
+          <label>Suspension Roll Lean:</label>
+          <input type="checkbox" id="chkLean">
+        </div>
+        <button class="btn" id="btnFireTest" style="width:100%;justify-content:center;margin-top:6px">
+          Test Fire Roof Cannons
+        </button>
+      </div>
+
+      <!-- Loadouts & Accessories -->
+      <div>
+        <div class="section-title">Weapon & Gear Mounts</div>
+        <div class="toggle-row">
+          <label>Roof Autocannon Turret:</label>
+          <input type="checkbox" id="chkTurret" checked>
+        </div>
+        <div class="toggle-row">
+          <label>Side Rocket Pods:</label>
+          <input type="checkbox" id="chkRockets" checked>
+        </div>
+        <div class="toggle-row">
+          <label>Ramming Blades:</label>
+          <input type="checkbox" id="chkBlades">
+        </div>
+        <div class="toggle-row">
+          <label>Energy Shield Bubble:</label>
+          <input type="checkbox" id="chkShield">
+        </div>
+        <div class="toggle-row">
+          <label>Neon Underglow Strip:</label>
+          <input type="checkbox" id="chkUnderglow">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Center Viewport -->
+  <div id="viewport-container">
+    <div id="view-bar">
+      <button class="view-btn active" data-cam="persp">Perspective</button>
+      <button class="view-btn" data-cam="front">Front</button>
+      <button class="view-btn" data-cam="side">Side</button>
+      <button class="view-btn" data-cam="top">Top</button>
+      <button class="view-btn" data-cam="rear">Rear</button>
+      <button class="view-btn" data-cam="turret">Turret Close-up</button>
+    </div>
+    <canvas id="gl"></canvas>
+  </div>
+
+  <!-- Right Panel: Technical Inspector & AI Spec for Argon -->
+  <div class="panel">
+    <div class="panel-header">
+      <span>AI / DEVELOPER SPEC</span>
+      <span style="color:#777;font-size:11px">ARGON GUIDE</span>
+    </div>
+    <div class="panel-body">
+      <!-- Geometry Metrics -->
+      <div>
+        <div class="section-title">Model Metrics</div>
+        <div class="metric-grid">
+          <div class="metric-card">
+            <small>Triangles</small>
+            <b id="statTris">0</b>
+          </div>
+          <div class="metric-card">
+            <small>Named Meshes</small>
+            <b id="statMeshes">0</b>
+          </div>
+          <div class="metric-card">
+            <small>Dimensions (W×H×L)</small>
+            <b id="statDim" style="font-size:12px">0×0×0</b>
+          </div>
+          <div class="metric-card">
+            <small>Wheelbase</small>
+            <b id="statWheelbase" style="font-size:12px">0 m</b>
+          </div>
+        </div>
+      </div>
+
+      <!-- Node Hierarchy Tree -->
+      <div>
+        <div class="section-title">Scene Graph & Pivot Hierarchy</div>
+        <div class="tree-container" id="treeView"></div>
+      </div>
+
+      <!-- Architectural Spec for Argon -->
+      <div>
+        <div class="section-title">Specification for Argon AI</div>
+        <div class="spec-box">
+          <b>Three.js 3D Coordinate Contract:</b><br>
+          • <b>Facing:</b> <code>+Z forward</code>, <code>+Y up</code>, <code>+X right</code>.<br>
+          • <b>Root Node:</b> <code>root</code> (handles yaw heading rotation).<br>
+          • <b>Tilt Node:</b> <code>tilt</code> (child of root; handles pitch/roll lean).<br>
+          • <b>Wheel Assemblies:</b> 4 assemblies (<code>FL, FR, RL, RR</code>). Each assembly has:
+            <br>&nbsp;&nbsp;→ <code>suspension</code> (travel)
+            <br>&nbsp;&nbsp;→ <code>steer_pivot</code> (steer yaw rotation)
+            <br>&nbsp;&nbsp;→ <code>wheel_spin</code> (forward roll rotation: <code>rotation.x</code>).<br>
+          • <b>Roof Turret:</b>
+            <br>&nbsp;&nbsp;→ <code>turret_node</code> (yaw aim rotation: <code>rotation.y</code>)
+            <br>&nbsp;&nbsp;→ <code>turret_pitch</code> (pitch elevation/recoil)
+            <br>&nbsp;&nbsp;→ <code>muzzle_L</code>, <code>muzzle_R</code> (bullet spawn anchors)
+            <br>&nbsp;&nbsp;→ <code>muzzle_flash_L</code>, <code>muzzle_flash_R</code> (flash meshes).<br>
+          • <b>Exhaust Anchors:</b> <code>exhaust_anchor_L/R</code> (nitro flame anchors).<br>
+          • <b>Secondary Mounts:</b> <code>rocket_pod_L/R</code>.<br>
+          • <b>Materials:</b> <code>paintMat</code>, <code>accentMat</code>, <code>gunmetal</code>, <code>chrome</code>, <code>rubber</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast">Model exported!</div>
+
+<!-- Studio Engine Logic -->
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+// Expose on global window for developer console and automated testing / scripting
+window.THREE = THREE;
+window.OrbitControls = OrbitControls;
+window.GLTFExporter = GLTFExporter;
+
+/* ==========================================================================
+   01 · CORE MATH & PRNG
+   ========================================================================== */
+const TAU = Math.PI * 2;
+const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ==========================================================================
+   02 · ASSETS & PROCEDURAL TEXTURES
+   ========================================================================== */
+const Assets = {
+  _tex: {},
+  _mat: {},
+  _geo: {},
+  canvas(w, h, fn) {
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    fn(c.getContext('2d'), w, h);
+    return c;
+  },
+  tex(key, w, h, fn, srgb = false) {
+    if (!this._tex[key]) {
+      const t = new THREE.CanvasTexture(this.canvas(w, h, fn));
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 4;
+      this._tex[key] = t;
+    }
+    return this._tex[key];
+  },
+  mat(key, make) {
+    if (!this._mat[key]) this._mat[key] = make();
+    return this._mat[key];
+  },
+  geo(key, make) {
+    if (!this._geo[key]) this._geo[key] = make();
+    return this._geo[key];
+  },
+
+  /** Procedural weathering: rust blooms, scratches, worn paint, grime gradient. */
+  weather() {
+    return this.tex('weather', 256, 256, (g, w, h) => {
+      const rnd = mulberry32(7);
+      g.fillStyle = '#ffffff';
+      g.fillRect(0, 0, w, h);
+      const gr = g.createLinearGradient(0, 0, 0, h);
+      gr.addColorStop(0, 'rgba(120,110,100,0)');
+      gr.addColorStop(1, 'rgba(70,58,46,0.55)');
+      g.fillStyle = gr;
+      g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 150; i++) {
+        const x = rnd() * w;
+        const y = rnd() * h;
+        const r = 4 + rnd() * 24;
+        g.fillStyle = `rgba(${(150 + rnd() * 50) | 0},${(70 + rnd() * 35) | 0},28,${0.08 + rnd() * 0.25})`;
+        g.beginPath();
+        g.arc(x, y, r, 0, TAU);
+        g.fill();
+      }
+      g.strokeStyle = 'rgba(55,55,55,0.45)';
+      for (let i = 0; i < 140; i++) {
+        const x = rnd() * w;
+        const y = rnd() * h;
+        const a = rnd() * TAU;
+        const L = 6 + rnd() * 26;
+        g.lineWidth = 0.5 + rnd() * 0.9;
+        g.beginPath();
+        g.moveTo(x, y);
+        g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L);
+        g.stroke();
+      }
+      for (let i = 0; i < 320; i++) {
+        g.fillStyle = `rgba(255,255,255,${0.08 + rnd() * 0.12})`;
+        g.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 3, 1 + rnd() * 2);
+      }
+    }, true);
+  },
+
+  /** Hazard-stripe texture for plows, boards and bumpers. */
+  hazard() {
+    return this.tex('hazard', 128, 128, (g, w, h) => {
+      g.fillStyle = '#141414';
+      g.fillRect(0, 0, w, h);
+      g.fillStyle = '#ffc400';
+      for (let k = -h; k < w + h; k += 32) {
+        g.beginPath();
+        g.moveTo(k, 0);
+        g.lineTo(k + 16, 0);
+        g.lineTo(k + 16 + h, h);
+        g.lineTo(k + h, h);
+        g.closePath();
+        g.fill();
+      }
+    }, true);
+  },
+
+  paint(color) {
+    return this.mat(`paint${color}`, () => new THREE.MeshStandardMaterial({
+      color,
+      map: this.weather(),
+      metalness: 0.55,
+      roughness: 0.36
+    }));
+  },
+  gunmetal() {
+    return this.mat('gunmetal', () => new THREE.MeshStandardMaterial({
+      color: 0x2b2f34,
+      metalness: 0.85,
+      roughness: 0.42,
+      map: this.weather()
+    }));
+  },
+  chrome() {
+    return this.mat('chrome', () => new THREE.MeshStandardMaterial({
+      color: 0xcfd6dc,
+      metalness: 1.0,
+      roughness: 0.18
+    }));
+  },
+  rubber() {
+    return this.mat('rubber', () => new THREE.MeshStandardMaterial({
+      color: 0x151515,
+      metalness: 0.0,
+      roughness: 0.93
+    }));
+  },
+  glass() {
+    return this.mat('glass', () => new THREE.MeshStandardMaterial({
+      color: 0x8fb8d8,
+      metalness: 0.2,
+      roughness: 0.05,
+      transparent: true,
+      opacity: 0.42,
+      side: THREE.DoubleSide
+    }));
+  },
+  hazardMat() {
+    return this.mat('hazardMat', () => new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: this.hazard(),
+      metalness: 0.25,
+      roughness: 0.6
+    }));
+  },
+  lampWhite() {
+    return this.mat('lampW', () => new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0xfff4d6,
+      emissiveIntensity: 1.6
+    }));
+  },
+  lampRed() {
+    return this.mat('lampR', () => new THREE.MeshStandardMaterial({
+      color: 0x440000,
+      emissive: 0xff1a10,
+      emissiveIntensity: 1.3
+    }));
+  },
+  flashMat() {
+    return this.mat('flash', () => new THREE.MeshBasicMaterial({
+      color: 0xffd27a,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false
+    }));
+  }
+};
+
+/* ==========================================================================
+   03 · 2D PROFILE EXTRUSION
+   ========================================================================== */
+function profileGeo(points, width, bevel = 0.035) {
+  const shape = new THREE.Shape();
+  shape.moveTo(points[0][0], points[0][1]);
+  for (let i = 1; i < points.length; i++) shape.lineTo(points[i][0], points[i][1]);
+  shape.closePath();
+  const g = new THREE.ExtrudeGeometry(shape, {
+    depth: width,
+    bevelEnabled: true,
+    bevelThickness: bevel,
+    bevelSize: bevel,
+    bevelSegments: 2,
+    steps: 1,
+    curveSegments: 1,
+  });
+  g.applyMatrix4(new THREE.Matrix4().makeRotationY(-Math.PI / 2));
+  g.translate(width / 2, 0, 0);
+  g.computeBoundingBox();
+  return g;
+}
+
+function yAt(points, z) {
+  let best = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < points.length - 1; i++) {
+    const [z1, y1] = points[i];
+    const [z2, y2] = points[i + 1];
+    if (z >= Math.min(z1, z2) && z <= Math.max(z1, z2) && z1 !== z2) {
+      const t = (z - z1) / (z2 - z1);
+      best = Math.max(best, y1 + (y2 - y1) * t);
+    }
+  }
+  return best === Number.NEGATIVE_INFINITY ? 1.5 : best;
+}
+
+/* ==========================================================================
+   04 · VEHICLE SILHOUETTE PROFILES
+   ========================================================================== */
+const CAR_PROFILES = {
+  muscle: {
+    lower: [[-2.95,0.42],[-2.95,1.2],[-2.55,1.42],[-1.2,1.48],[1.7,1.5],[2.55,1.36],[2.95,1.05],[2.95,0.42]],
+    lowerW: 2.5,
+    hood: [[0.7,1.46],[0.9,1.94],[2.8,1.4],[2.92,1.22],[2.5,1.44]],
+    hoodW: 2.36,
+    cabin: [[0.7,1.47],[0.35,2.42],[-0.9,2.6],[-1.55,2.35],[-2.3,1.6],[-2.3,1.47]],
+    cabinW: 2.0,
+    fast: [[-1.95,2.25],[-2.6,1.72],[-2.85,1.52],[-2.2,1.44],[-1.6,1.45]],
+    fastW: 2.2,
+    wind: [[0.72,1.5],[0.37,2.4],[0.31,2.41],[0.66,1.5]],
+    windW: 1.84,
+    plow: [[2.85,0.18],[3.55,0.42],[3.62,0.98],[2.95,1.02]],
+    plowW: 2.6,
+    diff: [[-2.95,0.4],[-3.22,0.2],[-3.22,0.5],[-2.95,0.56]],
+    diffW: 2.3,
+    track: 1.2,
+    wheelZ: 1.9,
+    rearZ: -1.9,
+    rollY: 2.6,
+  },
+  interceptor: {
+    lower: [[-2.9,0.4],[-2.98,1.15],[-2.2,1.36],[-0.9,1.42],[1.9,1.38],[2.8,1.12],[2.92,0.8],[2.9,0.4]],
+    lowerW: 2.42,
+    hood: [[0.5,1.4],[0.7,1.78],[2.7,1.32],[2.85,1.14],[2.4,1.38]],
+    hoodW: 2.3,
+    cabin: [[0.5,1.4],[0.12,2.24],[-1.0,2.42],[-2.1,1.9],[-2.5,1.4]],
+    cabinW: 1.9,
+    fast: [[-1.8,2.1],[-2.6,1.55],[-2.85,1.42],[-1.8,1.4]],
+    fastW: 2.1,
+    wind: [[0.52,1.42],[0.14,2.22],[0.08,2.23],[0.44,1.42]],
+    windW: 1.78,
+    plow: [[2.8,0.2],[3.3,0.38],[3.34,0.8],[2.9,0.84]],
+    plowW: 2.4,
+    diff: [[-2.9,0.38],[-3.15,0.22],[-3.15,0.44],[-2.9,0.5]],
+    diffW: 2.2,
+    track: 1.22,
+    wheelZ: 1.85,
+    rearZ: -1.85,
+    rollY: 2.42,
+  },
+  hauler: {
+    lower: [[-3.0,0.5],[-3.0,1.35],[-2.8,1.5],[-1.0,1.55],[2.2,1.55],[2.85,1.42],[3.0,1.1],[3.0,0.5]],
+    lowerW: 2.6,
+    hood: [[1.0,1.53],[1.1,1.86],[2.85,1.5],[2.95,1.32],[2.5,1.52]],
+    hoodW: 2.5,
+    cabin: [[0.9,1.52],[0.7,2.7],[-1.2,2.85],[-2.0,2.4],[-2.0,1.52]],
+    cabinW: 2.1,
+    fast: [[-1.9,2.55],[-2.9,2.5],[-3.0,1.6],[-1.9,1.5]],
+    fastW: 2.3,
+    wind: [[0.92,1.54],[0.72,2.66],[0.66,2.67],[0.86,1.54]],
+    windW: 1.9,
+    plow: [[2.95,0.25],[3.6,0.5],[3.66,1.0],[3.0,1.05]],
+    plowW: 2.7,
+    diff: [[-3.0,0.45],[-3.25,0.25],[-3.25,0.55],[-3.0,0.6]],
+    diffW: 2.4,
+    track: 1.28,
+    wheelZ: 2.0,
+    rearZ: -2.0,
+    rollY: 2.85,
+  },
+};
+
+const CAR_STYLES = {
+  muscle: { label: 'BLOODHAMMER', style: 'muscle', paint: 0x9d1b1b, accent: 0xf2b705 },
+  interceptor: { label: 'RAZORBACK', style: 'interceptor', paint: 0x1d3f6e, accent: 0xff6a00 },
+  hauler: { label: 'GUTSHOT', style: 'hauler', paint: 0x4b5a2a, accent: 0xd9d9d9 },
+};
+
+/* ==========================================================================
+   05 · WHEEL ASSEMBLY GENERATOR
+   ========================================================================== */
+function buildWheel(corner, x, z, front) {
+  const side = x > 0 ? 1 : -1;
+  const root = new THREE.Group();
+  root.name = `wheel_${corner}`;
+  root.position.set(x, 0.62, z);
+
+  const suspension = new THREE.Group();
+  suspension.name = `suspension_${corner}`;
+  root.add(suspension);
+
+  const steer = new THREE.Group();
+  steer.name = front ? `steer_pivot_${corner}` : `hub_pivot_${corner}`;
+  suspension.add(steer);
+
+  const spin = new THREE.Group();
+  spin.name = `wheel_spin_${corner}`;
+  steer.add(spin);
+
+  const tireGeo = Assets.geo('tireGeo', () => {
+    const pts = [new THREE.Vector2(0.4, -0.3)];
+    for (let k = 0; k <= 6; k++) {
+      const y = -0.3 + k * 0.1;
+      pts.push(new THREE.Vector2(0.62, y));
+      pts.push(new THREE.Vector2(0.55, y + 0.05));
+    }
+    pts.push(new THREE.Vector2(0.62, 0.3));
+    pts.push(new THREE.Vector2(0.4, 0.3));
+    const g = new THREE.LatheGeometry(pts, 26);
+    g.rotateZ(Math.PI / 2);
+    return g;
+  });
+
+  const rimGeo = Assets.geo('rimGeo', () => {
+    const pts = [
+      new THREE.Vector2(0.08, -0.22),
+      new THREE.Vector2(0.38, -0.2),
+      new THREE.Vector2(0.44, -0.12),
+      new THREE.Vector2(0.44, 0.2),
+      new THREE.Vector2(0.3, 0.22),
+      new THREE.Vector2(0.1, 0.1),
+    ];
+    const g = new THREE.LatheGeometry(pts, 20);
+    g.rotateZ(Math.PI / 2);
+    return g;
+  });
+
+  const discGeo = Assets.geo('discGeo', () => {
+    const g = new THREE.CylinderGeometry(0.3, 0.3, 0.06, 20);
+    g.rotateZ(Math.PI / 2);
+    return g;
+  });
+
+  const caliperGeo = Assets.geo('caliperGeo', () => new THREE.BoxGeometry(0.14, 0.22, 0.2));
+  const lugGeo = Assets.geo('lugGeo', () => {
+    const g = new THREE.CylinderGeometry(0.05, 0.05, 0.08, 6);
+    g.rotateZ(Math.PI / 2);
+    return g;
+  });
+
+  const tire = new THREE.Mesh(tireGeo, Assets.rubber());
+  tire.name = `tire_${corner}`;
+  tire.castShadow = true;
+  spin.add(tire);
+
+  const rim = new THREE.Mesh(rimGeo, Assets.chrome());
+  rim.name = `rim_${corner}`;
+  spin.add(rim);
+
+  const brake = new THREE.Mesh(discGeo, Assets.gunmetal());
+  brake.name = `brake_disc_${corner}`;
+  brake.position.x = side * 0.05;
+  spin.add(brake);
+
+  const lugs = new THREE.InstancedMesh(lugGeo, Assets.chrome(), 5);
+  lugs.name = `lug_nuts_${corner}`;
+  const m4 = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const p = new THREE.Vector3();
+  const s = new THREE.Vector3(1, 1, 1);
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * TAU;
+    p.set(side * 0.24, Math.cos(a) * 0.2, Math.sin(a) * 0.2);
+    m4.compose(p, q, s);
+    lugs.setMatrixAt(k, m4);
+  }
+  lugs.instanceMatrix.needsUpdate = true;
+  spin.add(lugs);
+
+  const caliper = new THREE.Mesh(caliperGeo, Assets.mat('caliper', () => new THREE.MeshStandardMaterial({
+    color: 0xc0392b, metalness: 0.5, roughness: 0.4
+  })));
+  caliper.name = `brake_caliper_${corner}`;
+  caliper.position.set(-side * 0.1, 0.22, 0);
+  steer.add(caliper);
+
+  return { name: corner, front, root, suspension, steer, spin, x, z };
+}
+
+/* ==========================================================================
+   06 · PROCEDURAL DEATH CAR BUILDER (MASTER GENERATOR)
+   ========================================================================== */
+class ProceduralDeathCarBuilder {
+  static build(styleKey, customColors = null) {
+    const cfg = CAR_STYLES[styleKey] || CAR_STYLES.muscle;
+    const P = CAR_PROFILES[cfg.style];
+
+    const root = new THREE.Group();
+    root.name = `car_${styleKey}`;
+    root.rotation.order = 'YXZ';
+
+    const tilt = new THREE.Group();
+    tilt.name = 'tilt';
+    root.add(tilt);
+
+    const parts = [];
+    const detachables = [];
+
+    const paintHex = customColors?.paint ?? cfg.paint;
+    const accentHex = customColors?.accent ?? cfg.accent;
+
+    const paintMat = Assets.paint(paintHex).clone();
+    paintMat.name = `paint_${styleKey}`;
+
+    const accentMat = new THREE.MeshStandardMaterial({
+      color: accentHex,
+      metalness: 0.4,
+      roughness: 0.45,
+      map: Assets.weather(),
+    });
+    accentMat.name = `accent_${styleKey}`;
+
+    const gun = Assets.gunmetal();
+    const chrome = Assets.chrome();
+    const glass = Assets.glass();
+    const haz = Assets.hazardMat();
+
+    const add = (parent, geo, mat, name, pos = [0, 0, 0], rot = [0, 0, 0], opt = {}) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.name = name;
+      m.position.set(pos[0], pos[1], pos[2]);
+      m.rotation.set(rot[0], rot[1], rot[2]);
+      m.castShadow = true;
+      m.userData.component = name;
+      if (opt.detachable) {
+        m.userData.detachable = true;
+        detachables.push(m);
+      }
+      parent.add(m);
+      parts.push(m);
+      return m;
+    };
+
+    const box = (w, h, d) => Assets.geo(`box_${w}_${h}_${d}`, () => new THREE.BoxGeometry(w, h, d));
+    const cyl = (r, l, seg = 14) => Assets.geo(`cyl_${r}_${l}_${seg}`, () => new THREE.CylinderGeometry(r, r, l, seg));
+    const tubeGeo = (pts, r, key) =>
+      Assets.geo(`tube_${key}`, () => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 28, r, 6, false));
+    const X90 = [Math.PI / 2, 0, 0];
+
+    // Chassis Lower & Upper
+    add(tilt, Assets.geo(`${styleKey}_lower`, () => profileGeo(P.lower, P.lowerW)), paintMat, 'chassis_lower');
+    add(tilt, Assets.geo(`${styleKey}_hood`, () => profileGeo(P.hood, P.hoodW)), paintMat, 'hood');
+
+    const hoodTop = yAt(P.hood, 1.5);
+    add(tilt, box(0.8, 0.3, 0.9), gun, 'hood_scoop', [0, hoodTop + 0.12, 1.5]);
+    for (let k = 0; k < 4; k++) {
+      const zz = 0.9 + (k % 2) * 0.7;
+      const xx = k < 2 ? -0.42 : 0.42;
+      add(tilt, box(0.42, 0.05, 0.16), gun, `hood_vent_${k}`, [xx, yAt(P.hood, zz) + 0.03, zz]);
+    }
+
+    add(tilt, Assets.geo(`${styleKey}_cabin`, () => profileGeo(P.cabin, P.cabinW)), paintMat, 'cabin');
+    const roofY = yAt(P.cabin, -0.4);
+    add(tilt, box(2.0, 0.12, 1.5), gun, 'roof_panel', [0, roofY + 0.06, -0.4]);
+    add(tilt, box(0.6, 0.05, 0.5), gun, 'roof_hatch', [0, roofY + 0.14, -0.2]);
+    add(tilt, Assets.geo(`${styleKey}_fast`, () => profileGeo(P.fast, P.fastW)), paintMat, 'fastback');
+    add(tilt, Assets.geo(`${styleKey}_wind`, () => profileGeo(P.wind, P.windW, 0.01)), glass, 'windshield');
+
+    // Windows slats & side armor
+    for (let side = -1; side <= 1; side += 2) {
+      const sName = side < 0 ? 'L' : 'R';
+      for (let k = 0; k < 3; k++) {
+        add(tilt, box(0.07, 0.62, 0.1), gun, `window_slat_${sName}_${k}`, [side * 1.02, roofY - 0.35, 0.1 - k * 0.65]);
+      }
+      add(tilt, box(0.14, 0.22, 4.8), gun, `side_skirt_${sName}`, [side * 1.3, 0.42, 0]);
+      add(tilt, box(0.06, 1.0, 1.5), paintMat, `armor_plate_door_${sName}`, [side * 1.06, 1.85, -0.6], [0, 0, 0], { detachable: true });
+      add(tilt, box(0.14, 0.14, 0.26), gun, `mirror_stem_${sName}`, [side * 1.3, 1.82, 0.5]);
+      add(tilt, box(0.14, 0.22, 0.24), gun, `mirror_${sName}`, [side * 1.45, 1.86, 0.5]);
+      add(tilt, cyl(0.17, 0.12, 16), Assets.lampWhite(), `headlight_${sName}`, [side * 0.85, 1.22, 2.92], X90);
+      add(tilt, box(0.36, 0.16, 0.07), Assets.lampRed(), `taillight_${sName}`, [side * 0.95, 1.38, -2.98]);
+      add(tilt, cyl(0.085, 0.7, 14), chrome, `exhaust_pipe_${sName}`, [side * 0.72, 0.62, -3.05], X90);
+      add(tilt, cyl(0.1, 0.04, 14), gun, `exhaust_tip_${sName}`, [side * 0.72, 0.62, -3.42], X90);
+
+      const anchor = new THREE.Object3D();
+      anchor.name = `exhaust_anchor_${sName}`;
+      anchor.position.set(side * 0.72, 0.62, -3.5);
+      tilt.add(anchor);
+
+      // Rocket Pods
+      const pod = new THREE.Group();
+      pod.name = `rocket_pod_${sName}`;
+      pod.position.set(side * 1.62, 1.05, 0.1);
+      tilt.add(pod);
+      add(pod, cyl(0.3, 1.9, 16), gun, `rocket_pod_body_${sName}`, [0, 0, 0], X90);
+      for (let k = 0; k < 4; k++) {
+        add(pod, cyl(0.09, 0.12, 10), Assets.mat('tubeMat', () => new THREE.MeshStandardMaterial({
+          color: 0x3a3a3a, metalness: 0.7, roughness: 0.35
+        })), `rocket_tube_${sName}_${k}`, [k % 2 ? 0.12 : -0.12, k < 2 ? 0.12 : -0.12, 0.98], X90);
+      }
+      add(pod, box(0.5, 0.1, 0.14), gun, `rocket_pylon_${sName}`, [-side * 0.6, 0, 0]);
+    }
+
+    if (cfg.style === 'hauler') {
+      for (let side = -1; side <= 1; side += 2)
+        add(tilt, box(0.1, 0.7, 3.2), haz, `side_board_${side < 0 ? 'L' : 'R'}`, [side * 1.36, 0.95, -0.2]);
+    }
+
+    // Front Ramming Plow
+    add(tilt, Assets.geo(`${styleKey}_plow`, () => profileGeo(P.plow, P.plowW)), haz, 'front_plow');
+    for (let k = 0; k < 5; k++) {
+      add(tilt, Assets.geo('spikeCone', () => new THREE.ConeGeometry(0.1, 0.45, 8)), chrome, `plow_spike_${k}`, [-0.9 + k * 0.45, 0.6, 3.6], X90);
+    }
+
+    // Rear Diffuser & Bumpers
+    add(tilt, Assets.geo(`${styleKey}_diff`, () => profileGeo(P.diff, P.diffW)), gun, 'rear_diffuser');
+    for (let k = 0; k < 5; k++)
+      add(tilt, box(0.05, 0.24, 0.42), gun, `diffuser_fin_${k}`, [-0.9 + k * 0.45, 0.32, -3.1]);
+    add(tilt, box(2.7, 0.3, 0.36), cfg.style === 'hauler' ? haz : gun, 'rear_bumper', [0, 0.82, -3.2]);
+    add(tilt, cyl(0.07, 2.6, 8), chrome, 'rear_bumper_bar', [0, 0.6, -3.3], [0, 0, Math.PI / 2]);
+
+    // External Rollcage
+    const cageHoop = (z, name) => {
+      const pts = [
+        new THREE.Vector3(-1.2, 1.5, z),
+        new THREE.Vector3(-1.2, P.rollY, z),
+        new THREE.Vector3(1.2, P.rollY, z),
+        new THREE.Vector3(1.2, 1.5, z),
+      ];
+      add(tilt, tubeGeo(pts, 0.06, name), gun, name);
+    };
+    cageHoop(0.2, 'rollcage_front');
+    cageHoop(-1.7, 'rollcage_rear');
+    for (let side = -1; side <= 1; side += 2) {
+      const pts = [new THREE.Vector3(side * 1.2, P.rollY, 0.2), new THREE.Vector3(side * 1.2, P.rollY, -1.7)];
+      add(tilt, tubeGeo(pts, 0.05, `rollcage_rail_${side < 0 ? 'L' : 'R'}`), gun, `rollcage_rail_${side < 0 ? 'L' : 'R'}`);
+    }
+
+    // Additional Plates & Fittings
+    add(tilt, box(1.4, 0.06, 1.2), paintMat, 'armor_plate_hood', [0, hoodTop + 0.05, 1.1], [0, 0, 0], { detachable: true });
+    add(tilt, box(2.3, 0.7, 0.06), accentMat, 'armor_plate_tail', [0, 1.02, -2.96], [0, 0, 0], { detachable: true });
+    add(tilt, box(0.8, 0.5, 0.6), chrome, 'fuel_can', [0.92, 1.95, -2.5]);
+    add(tilt, cyl(0.02, 1.5, 6), chrome, 'antenna_mast', [-0.95, roofY + 0.8, -1.6]);
+    add(tilt, Assets.geo('antBall', () => new THREE.SphereGeometry(0.07, 8, 6)), Assets.lampRed(), 'antenna_ball', [-0.95, roofY + 1.55, -1.6]);
+
+    if (cfg.style === 'muscle' || cfg.style === 'hauler') {
+      add(tilt, Assets.geo('spareTire', () => new THREE.TorusGeometry(0.42, 0.13, 10, 22)), Assets.rubber(), 'spare_tire', [0, 1.72, -2.25]);
+    }
+    if (cfg.style === 'interceptor') {
+      add(tilt, box(2.3, 0.06, 0.5), accentMat, 'rear_wing_plate', [0, 2.3, -2.7]);
+      for (let side = -1; side <= 1; side += 2)
+        add(tilt, box(0.08, 0.5, 0.1), gun, `rear_wing_strut_${side < 0 ? 'L' : 'R'}`, [side * 0.8, 1.9, -2.6]);
+    }
+    add(tilt, box(0.7, 0.05, 0.4), gun, 'intake_grille', [0, hoodTop + 0.28, 1.5]);
+
+    // Roof Autocannon Turret Node & Pitch Assembly
+    add(tilt, cyl(0.42, 0.2, 18), gun, 'turret_base', [0, roofY + 0.12, 0.25]);
+
+    const turretNode = new THREE.Group();
+    turretNode.name = 'turret_node';
+    turretNode.position.set(0, roofY + 0.24, 0.25);
+    tilt.add(turretNode);
+    add(turretNode, box(0.95, 0.22, 0.6), gun, 'turret_yoke', [0, 0.06, 0]);
+
+    const turretPitch = new THREE.Group();
+    turretPitch.name = 'turret_pitch';
+    turretPitch.position.set(0, 0.22, 0.05);
+    turretNode.add(turretPitch);
+    add(turretPitch, box(0.62, 0.26, 0.7), accentMat, 'autocannon_housing');
+
+    const muzzles = [];
+    for (let side = -1; side <= 1; side += 2) {
+      const sName = side < 0 ? 'L' : 'R';
+      add(turretPitch, cyl(0.075, 1.5, 10), chrome, `autocannon_barrel_${sName}`, [side * 0.2, 0, 0.95], X90);
+      add(turretPitch, cyl(0.11, 0.5, 10), gun, `autocannon_shroud_${sName}`, [side * 0.2, 0, 0.62], X90);
+
+      const mz = new THREE.Object3D();
+      mz.name = `muzzle_${sName}`;
+      mz.position.set(side * 0.2, 0, 1.75);
+      turretPitch.add(mz);
+      muzzles.push(mz);
+
+      const flash = add(turretPitch, Assets.geo('flashGeo', () => new THREE.SphereGeometry(0.22, 8, 6)), Assets.flashMat(), `muzzle_flash_${sName}`, [side * 0.2, 0, 1.85]);
+      flash.visible = false;
+      flash.castShadow = false;
+    }
+
+    // Four Independent Wheel Assemblies
+    const wheels = [];
+    const corners = [
+      ['FL', -P.track, P.wheelZ, true],
+      ['FR', P.track, P.wheelZ, true],
+      ['RL', -P.track, P.rearZ, false],
+      ['RR', P.track, P.rearZ, false],
+    ];
+    for (const [c, x, z, front] of corners) {
+      const w = buildWheel(c, x, z, front);
+      tilt.add(w.root);
+      wheels.push(w);
+      const flare = add(tilt, box(0.22, 0.14, 0.95), paintMat, `fender_flare_${c}`, [x > 0 ? 1.3 : -1.3, 1.38, z]);
+      flare.castShadow = false;
+    }
+
+    // Accessories: Shield, Blades, Neon Underglow
+    const shieldGeo = new THREE.SphereGeometry(1, 18, 12);
+    const shieldMat = new THREE.MeshBasicMaterial({ color: 0x3ab0ff, transparent: true, opacity: 0.25, depthWrite: false });
+    const shield = new THREE.Mesh(shieldGeo, shieldMat);
+    shield.scale.set(2.5, 1.6, 3.6);
+    shield.position.set(0, 1.2, 0);
+    shield.name = 'shield_bubble';
+    shield.visible = false;
+    tilt.add(shield);
+
+    const gearGeo = new THREE.BoxGeometry(0.12, 0.08, 5.4);
+    const gearMat = new THREE.MeshBasicMaterial({ color: 0x39ff88 });
+    const gear = new THREE.Group();
+    gear.name = 'neon_gear';
+    for (const x of [-1.25, 1.25]) {
+      const strip = new THREE.Mesh(gearGeo, gearMat);
+      strip.position.set(x, 0.25, 0);
+      gear.add(strip);
+    }
+    gear.visible = false;
+    tilt.add(gear);
+
+    const bladeGeo = new THREE.BoxGeometry(0.1, 0.55, 2.6);
+    const bladeMat = new THREE.MeshStandardMaterial({ color: 0xe8ecf2, metalness: 0.9, roughness: 0.2 });
+    const blades = new THREE.Group();
+    blades.name = 'crossed_blades';
+    for (const x of [-1.05, 1.05]) {
+      const b = new THREE.Mesh(bladeGeo, bladeMat);
+      b.position.set(x, 0.7, 3.2);
+      b.rotation.y = -Math.sign(x) * 0.35;
+      blades.add(b);
+    }
+    blades.visible = false;
+    tilt.add(blades);
+
+    const wheelMeshes = [];
+    for (const w of wheels) {
+      w.root.traverse((o) => {
+        if (o.isMesh) wheelMeshes.push(o);
+      });
+    }
+
+    return {
+      root,
+      tilt,
+      wheels,
+      parts: parts.concat(wheelMeshes),
+      detachables,
+      turretNode,
+      turretPitch,
+      muzzles,
+      paintMat,
+      accentMat,
+      baseColor: new THREE.Color(paintHex),
+      shieldMesh: shield,
+      gearGroup: gear,
+      bladeGroup: blades,
+      anchors: [tilt.getObjectByName('exhaust_anchor_L'), tilt.getObjectByName('exhaust_anchor_R')],
+      rocketPods: [tilt.getObjectByName('rocket_pod_L'), tilt.getObjectByName('rocket_pod_R')],
+      flashes: [turretPitch.getObjectByName('muzzle_flash_L'), turretPitch.getObjectByName('muzzle_flash_R')],
+      lastFrac: 1,
+      styleKey,
+    };
+  }
+
+  static updateDamage(model, frac) {
+    if (Math.abs(frac - model.lastFrac) < 0.005) return;
+    model.lastFrac = frac;
+    const burn = clamp((1 - frac) * 1.2, 0, 1);
+    model.paintMat.color.copy(model.baseColor).lerp(new THREE.Color(0x141414), burn * 0.65);
+    model.paintMat.roughness = 0.36 + burn * 0.45;
+    const hot = frac < 0.3 ? (0.3 - frac) / 0.3 : 0;
+    model.paintMat.emissive.setRGB(0.35 * hot, 0.1 * hot, 0);
+  }
+
+  static detachPlate(model, rnd = Math.random) {
+    const list = model.detachables.filter((m) => m.visible);
+    if (!list.length) return null;
+    const m = list[Math.floor(rnd() * list.length) % list.length];
+    m.visible = false;
+    return m;
+  }
+}
+
+/* ==========================================================================
+   07 · 3D STUDIO VIEWER & INTERACTION ENGINE
+   ========================================================================== */
+class VehicleStudio {
+  constructor() {
+    this.container = document.getElementById('viewport-container');
+    this.canvas = document.getElementById('gl');
+
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(50, this.container.clientWidth / this.container.clientHeight, 0.2, 100);
+    this.camera.position.set(7.5, 4.2, 8.5);
+
+    this.renderer = new THREE.WebGLRenderer({
+      canvas: this.canvas,
+      antialias: true,
+      powerPreference: 'high-performance'
+    });
+    this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.1;
+
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.06;
+    this.controls.maxPolarAngle = Math.PI / 2 + 0.05;
+    this.controls.target.set(0, 1.2, 0);
+
+    this.currentStyle = 'muscle';
+    this.currentModel = null;
+    this.wireframeMode = false;
+    this.autoRotate = false;
+
+    this.setupLighting();
+    this.setupStage();
+    this.loadVehicle(this.currentStyle);
+    this.bindEvents();
+
+    window.addEventListener('resize', () => this.onResize());
+    this.lastTime = performance.now();
+    this.animate();
+  }
+
+  setupLighting() {
+    this.hemiLight = new THREE.HemisphereLight(0xffffff, 0x1f2430, 0.85);
+    this.scene.add(this.hemiLight);
+
+    // Key Light with soft shadow
+    this.keyLight = new THREE.DirectionalLight(0xfff5e6, 2.2);
+    this.keyLight.position.set(8, 12, 10);
+    this.keyLight.castShadow = true;
+    this.keyLight.shadow.mapSize.width = 2048;
+    this.keyLight.shadow.mapSize.height = 2048;
+    this.keyLight.shadow.camera.near = 0.5;
+    this.keyLight.shadow.camera.far = 35;
+    this.keyLight.shadow.camera.left = -6;
+    this.keyLight.shadow.camera.right = 6;
+    this.keyLight.shadow.camera.top = 6;
+    this.keyLight.shadow.camera.bottom = -6;
+    this.keyLight.shadow.bias = -0.0005;
+    this.scene.add(this.keyLight);
+
+    // Rim/Back Light (Cyan Cyber glow)
+    this.rimLight = new THREE.DirectionalLight(0x00d2ff, 1.4);
+    this.rimLight.position.set(-9, 7, -10);
+    this.scene.add(this.rimLight);
+
+    // Warm Fill Light
+    this.fillLight = new THREE.DirectionalLight(0xff7733, 0.7);
+    this.fillLight.position.set(9, 4, -8);
+    this.scene.add(this.fillLight);
+  }
+
+  setupStage() {
+    // Pedestal turntable
+    const pedestalGeo = new THREE.CylinderGeometry(5.2, 5.5, 0.4, 64);
+    const pedestalMat = new THREE.MeshStandardMaterial({
+      color: 0x141822,
+      metalness: 0.8,
+      roughness: 0.3
+    });
+    this.pedestal = new THREE.Mesh(pedestalGeo, pedestalMat);
+    this.pedestal.position.y = -0.2;
+    this.pedestal.receiveShadow = true;
+    this.scene.add(this.pedestal);
+
+    // Ground shadow receiver
+    const groundGeo = new THREE.PlaneGeometry(80, 80);
+    const groundMat = new THREE.MeshStandardMaterial({
+      color: 0x080a0e,
+      roughness: 0.85,
+      metalness: 0.2
+    });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.4;
+    ground.receiveShadow = true;
+    this.scene.add(ground);
+
+    // Circular concentric grid lines
+    const grid = new THREE.PolarGridHelper(5.2, 16, 8, 64, 0x3d4760, 0x222736);
+    grid.position.y = 0.01;
+    this.scene.add(grid);
+  }
+
+  loadVehicle(styleKey) {
+    if (this.currentModel) {
+      this.scene.remove(this.currentModel.root);
+    }
+    this.currentStyle = styleKey;
+    const paintColor = parseInt(document.getElementById('cpPaint').value.replace('#', '0x'));
+    const accentColor = parseInt(document.getElementById('cpAccent').value.replace('#', '0x'));
+
+    this.currentModel = ProceduralDeathCarBuilder.build(styleKey, {
+      paint: paintColor,
+      accent: accentColor
+    });
+    this.scene.add(this.currentModel.root);
+
+    this.syncControls();
+    this.updateInspector();
+    this.applyWireframe();
+  }
+
+  syncControls() {
+    const m = this.currentModel;
+    if (!m) return;
+    const metal = parseFloat(document.getElementById('rngMetal').value);
+    const rough = parseFloat(document.getElementById('rngRough').value);
+    m.paintMat.metalness = metal;
+    m.paintMat.roughness = rough;
+
+    const dmg = parseFloat(document.getElementById('rngDamage').value);
+    ProceduralDeathCarBuilder.updateDamage(m, dmg);
+
+    m.turretNode.visible = document.getElementById('chkTurret').checked;
+    for (const pod of m.rocketPods) if (pod) pod.visible = document.getElementById('chkRockets').checked;
+    m.bladeGroup.visible = document.getElementById('chkBlades').checked;
+    m.shieldMesh.visible = document.getElementById('chkShield').checked;
+    m.gearGroup.visible = document.getElementById('chkUnderglow').checked;
+  }
+
+  applyWireframe() {
+    if (!this.currentModel) return;
+    this.currentModel.root.traverse((obj) => {
+      if (obj.isMesh && obj.material) {
+        obj.material.wireframe = this.wireframeMode;
+      }
+    });
+  }
+
+  updateInspector() {
+    const m = this.currentModel;
+    if (!m) return;
+
+    // Calculate Triangle & Mesh Counts
+    let tris = 0;
+    let meshes = 0;
+    m.root.traverse((obj) => {
+      if (obj.isMesh) {
+        meshes++;
+        if (obj.geometry) {
+          const index = obj.geometry.index;
+          const pos = obj.geometry.attributes.position;
+          tris += index ? index.count / 3 : (pos ? pos.count / 3 : 0);
+        }
+      }
+    });
+
+    // Compute exact bounding box
+    const box = new THREE.Box3().setFromObject(m.root);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+
+    document.getElementById('statTris').textContent = Math.round(tris).toLocaleString();
+    document.getElementById('statMeshes').textContent = meshes;
+    document.getElementById('statDim').textContent = `${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)}m`;
+
+    const P = CAR_PROFILES[m.styleKey];
+    document.getElementById('statWheelbase').textContent = `${((P.wheelZ - P.rearZ)).toFixed(2)} m`;
+
+    // Render tree view
+    this.renderHierarchyTree(m.root);
+  }
+
+  renderHierarchyTree(root) {
+    const treeEl = document.getElementById('treeView');
+    treeEl.innerHTML = '';
+
+    const buildNodeHtml = (obj) => {
+      const isRoot = obj === root;
+      const isMesh = obj.isMesh;
+      const cls = isRoot ? 'tree-root' : isMesh ? 'tree-mesh' : 'tree-group';
+      const name = obj.name || (isMesh ? 'Mesh' : 'Group');
+      let html = `<div class="tree-node ${cls}">${name}</div>`;
+      if (obj.children && obj.children.length > 0) {
+        html += '<div style="margin-left:8px">';
+        for (const child of obj.children) {
+          html += buildNodeHtml(child);
+        }
+        html += '</div>';
+      }
+      return html;
+    };
+    treeEl.innerHTML = buildNodeHtml(root);
+  }
+
+  showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.opacity = '1';
+    setTimeout(() => { t.style.opacity = '0'; }, 2400);
+  }
+
+  bindEvents() {
+    // Preset cards
+    document.querySelectorAll('.preset-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.preset-card').forEach((c) => c.classList.remove('active'));
+        card.classList.add('active');
+        const style = card.dataset.style;
+        const cfg = CAR_STYLES[style];
+        document.getElementById('cpPaint').value = `#${cfg.paint.toString(16).padStart(6, '0')}`;
+        document.getElementById('cpAccent').value = `#${cfg.accent.toString(16).padStart(6, '0')}`;
+        this.loadVehicle(style);
+      });
+    });
+
+    // Color pickers
+    document.getElementById('cpPaint').addEventListener('input', (e) => {
+      if (this.currentModel) {
+        const hex = parseInt(e.target.value.replace('#', '0x'));
+        this.currentModel.baseColor.set(hex);
+        this.currentModel.paintMat.color.set(hex);
+      }
+    });
+    document.getElementById('cpAccent').addEventListener('input', (e) => {
+      if (this.currentModel) {
+        const hex = parseInt(e.target.value.replace('#', '0x'));
+        this.currentModel.accentMat.color.set(hex);
+      }
+    });
+
+    // Material sliders
+    document.getElementById('rngMetal').addEventListener('input', (e) => {
+      document.getElementById('valMetal').textContent = e.target.value;
+      if (this.currentModel) this.currentModel.paintMat.metalness = parseFloat(e.target.value);
+    });
+    document.getElementById('rngRough').addEventListener('input', (e) => {
+      document.getElementById('valRough').textContent = e.target.value;
+      if (this.currentModel) this.currentModel.paintMat.roughness = parseFloat(e.target.value);
+    });
+    document.getElementById('chkWeather').addEventListener('change', (e) => {
+      if (this.currentModel) {
+        this.currentModel.paintMat.map = e.target.checked ? Assets.weather() : null;
+        this.currentModel.paintMat.needsUpdate = true;
+      }
+    });
+
+    // Damage & Detach
+    document.getElementById('rngDamage').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      document.getElementById('valDamage').textContent = `${Math.round(val * 100)}%`;
+      if (this.currentModel) ProceduralDeathCarBuilder.updateDamage(this.currentModel, val);
+    });
+    document.getElementById('btnPopPlate').addEventListener('click', () => {
+      if (this.currentModel) {
+        const detached = ProceduralDeathCarBuilder.detachPlate(this.currentModel);
+        if (detached) {
+          this.showToast(`Detached plate: ${detached.name}`);
+        } else {
+          this.showToast('No more detachable plates on vehicle!');
+        }
+      }
+    });
+
+    // Rigging & Pivots
+    document.getElementById('rngSteer').addEventListener('input', (e) => {
+      const rad = parseFloat(e.target.value);
+      document.getElementById('valSteer').textContent = `${Math.round((rad * 180) / Math.PI)}°`;
+      if (this.currentModel) {
+        for (const w of this.currentModel.wheels) {
+          if (w.front) w.steer.rotation.y = rad;
+        }
+      }
+    });
+    document.getElementById('rngTurretYaw').addEventListener('input', (e) => {
+      const rad = parseFloat(e.target.value);
+      document.getElementById('valTurretYaw').textContent = `${Math.round((rad * 180) / Math.PI)}°`;
+      if (this.currentModel) this.currentModel.turretNode.rotation.y = rad;
+    });
+    document.getElementById('rngTurretPitch').addEventListener('input', (e) => {
+      const rad = parseFloat(e.target.value);
+      document.getElementById('valTurretPitch').textContent = `${Math.round((rad * 180) / Math.PI)}°`;
+      if (this.currentModel) this.currentModel.turretPitch.rotation.x = rad;
+    });
+
+    // Weapon Test Fire
+    document.getElementById('btnFireTest').addEventListener('click', () => {
+      if (!this.currentModel) return;
+      for (const flash of this.currentModel.flashes) if (flash) flash.visible = true;
+      this.currentModel.turretPitch.position.z -= 0.12; // recoil back
+      setTimeout(() => {
+        for (const flash of this.currentModel.flashes) if (flash) flash.visible = false;
+        this.currentModel.turretPitch.position.z += 0.12; // return
+      }, 90);
+      this.showToast('Twin autocannons fired!');
+    });
+
+    // Toggles
+    for (const [id, key] of [
+      ['chkTurret', 'turretNode'],
+      ['chkShield', 'shieldMesh'],
+      ['chkBlades', 'bladeGroup'],
+      ['chkUnderglow', 'gearGroup']
+    ]) {
+      document.getElementById(id).addEventListener('change', (e) => {
+        if (this.currentModel && this.currentModel[key]) {
+          this.currentModel[key].visible = e.target.checked;
+        }
+      });
+    }
+    document.getElementById('chkRockets').addEventListener('change', (e) => {
+      if (this.currentModel) {
+        for (const pod of this.currentModel.rocketPods) if (pod) pod.visible = e.target.checked;
+      }
+    });
+
+    // View buttons
+    document.querySelectorAll('.view-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.view-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.setCameraPreset(btn.dataset.cam);
+      });
+    });
+
+    // Header buttons
+    document.getElementById('btnWireframe').addEventListener('click', () => {
+      this.wireframeMode = !this.wireframeMode;
+      document.getElementById('btnWireframe').classList.toggle('cyan', this.wireframeMode);
+      this.applyWireframe();
+    });
+    document.getElementById('btnAutoRotate').addEventListener('click', () => {
+      this.autoRotate = !this.autoRotate;
+      document.getElementById('btnAutoRotate').classList.toggle('gold', this.autoRotate);
+    });
+    document.getElementById('btnResetView').addEventListener('click', () => {
+      this.setCameraPreset('persp');
+    });
+
+    // 1-Click GLTF / GLB Export
+    document.getElementById('btnExportGLB').addEventListener('click', () => this.exportGLB());
+  }
+
+  setCameraPreset(preset) {
+    const t = this.controls.target;
+    switch (preset) {
+      case 'front':
+        this.camera.position.set(0, 1.4, 8.5);
+        t.set(0, 1.2, 0);
+        break;
+      case 'side':
+        this.camera.position.set(8.5, 1.4, 0);
+        t.set(0, 1.2, 0);
+        break;
+      case 'top':
+        this.camera.position.set(0, 11, 0.1);
+        t.set(0, 0, 0);
+        break;
+      case 'rear':
+        this.camera.position.set(0, 1.6, -8.5);
+        t.set(0, 1.2, 0);
+        break;
+      case 'turret':
+        this.camera.position.set(1.6, 3.2, 2.4);
+        t.set(0, 2.4, 0.2);
+        break;
+      default:
+        this.camera.position.set(7.5, 4.2, 8.5);
+        t.set(0, 1.2, 0);
+        break;
+    }
+    this.controls.update();
+  }
+
+  exportGLB() {
+    if (!this.currentModel) return;
+    this.showToast('Generating .GLB binary package...');
+    const exporter = new GLTFExporter();
+    exporter.parse(
+      this.currentModel.root,
+      (buffer) => {
+        const blob = new Blob([buffer], { type: 'model/gltf-binary' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `DeathRace_${this.currentStyle.toUpperCase()}_Procedural.glb`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.showToast(`Exported: DeathRace_${this.currentStyle.toUpperCase()}_Procedural.glb`);
+      },
+      (error) => {
+        console.error('GLTF export error:', error);
+        this.showToast('Export failed!');
+      },
+      { binary: true }
+    );
+  }
+
+  onResize() {
+    const w = this.container.clientWidth;
+    const h = this.container.clientHeight;
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(w, h);
+  }
+
+  animate() {
+    requestAnimationFrame(() => this.animate());
+    const now = performance.now();
+    const dt = (now - this.lastTime) / 1000;
+    this.lastTime = now;
+
+    if (this.autoRotate) {
+      this.controls.autoRotate = true;
+      this.controls.autoRotateSpeed = 2.0;
+    } else {
+      this.controls.autoRotate = false;
+    }
+    this.controls.update();
+
+    // Wheel spin simulation
+    if (document.getElementById('chkSpin').checked && this.currentModel) {
+      for (const w of this.currentModel.wheels) {
+        w.spin.rotation.x += dt * 8.0;
+      }
+    }
+
+    // Suspension roll lean simulation
+    if (document.getElementById('chkLean').checked && this.currentModel) {
+      this.currentModel.tilt.rotation.z = Math.sin(now * 0.003) * 0.06;
+      this.currentModel.tilt.rotation.x = Math.cos(now * 0.002) * 0.03;
+    }
+
+    this.renderer.render(this.scene, this.camera);
+  }
+}
+
+// Bootstrap Studio on DOM load
+window.ProceduralDeathCarBuilder = ProceduralDeathCarBuilder;
+window.CAR_STYLES = CAR_STYLES;
+window.Assets = Assets;
+
+function initStudio() {
+  if (!window.Studio) {
+    window.Studio = new VehicleStudio();
+  }
+}
+
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', initStudio);
+} else {
+  initStudio();
+}
+</script>
+</body>
+</html>
